@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "FinanzApp",
+    "slug": "finanzapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#2196F3"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.finanzapp.app"
+    },
+    "android": {
+      "package": "com.finanzapp.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
