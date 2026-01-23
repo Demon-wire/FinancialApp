@@ -29,7 +29,7 @@ npm start
 Nach dem Starten solltest du sehen:
 - ✅ "Starting Metro Bundler"
 - ✅ Ein QR-Code im Terminal
-- ✅ Eine URL wie `exp://192.168.x.x:8081`
+- ✅ Eine URL wie `exp://192.168.x.x:8081 `
 
 ## Dann auf Android:
 
