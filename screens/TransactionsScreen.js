@@ -10,18 +10,7 @@ export default function TransactionsScreen() {
   const { currentTheme } = useTheme();
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: currentTheme.primary,
-        tabBarInactiveTintColor: 'gray',
-        tabBarStyle: {
-          backgroundColor: currentTheme.surface,
-        },
-        tabBarIndicatorStyle: {
-          backgroundColor: currentTheme.primary,
-        },
-      }}
-    >
+    <Tab.Navigator>
       <Tab.Screen name="Einnahmen" component={EinnahmenScreen} />
       <Tab.Screen name="Ausgaben" component={AusgabenScreen} />
     </Tab.Navigator>

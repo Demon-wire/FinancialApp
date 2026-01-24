@@ -41,28 +41,6 @@ function MainTabs({ onLogout }) {
         },
         tabBarActiveTintColor: currentTheme.primary,
         tabBarInactiveTintColor: 'gray',
-        tabBarStyle: {
-          backgroundColor: currentTheme.surface,
-        },
-        headerStyle: {
-          backgroundColor: currentTheme.headerBackground,
-        },
-        headerTintColor: currentTheme.headerText,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={onLogout}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={24}
-              color={currentTheme.headerText}
-            />
-          </TouchableOpacity>
-        ),
       })}
     >
       <Tab.Screen name="Transaktionen" component={TransactionsScreen} />
@@ -174,7 +152,7 @@ export default function App() {
         ) : (
           <Stack.Navigator
             screenOptions={{
-              headerShown: false,
+              // headerShown: false, // Temporarily removed for debugging
             }}
           >
             <Stack.Screen name="Login">

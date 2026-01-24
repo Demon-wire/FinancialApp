@@ -14,13 +14,21 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.finanzapp.app"
+      "bundleIdentifier": "com.finanzapp.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.finanzapp.app"
     },
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b9267b04-b353-4075-84bd-184d54f85572"
+      }
     }
   }
 }
