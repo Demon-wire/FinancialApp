@@ -15,6 +15,8 @@ import RegisterScreen from './screens/RegisterScreen';
 
 import AbosScreen from './screens/AbosScreen';
 
+import { processSubscriptions } from './utils/SubscriptionProcessor';
+
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -56,67 +58,26 @@ function MainTabs({ onLogout }) {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUserEmail, setCurrentUserEmail] = useState(null);
 
   useEffect(() => {
     checkLoginStatus();
   }, []);
 
   useEffect(() => {
-    if (isLoggedIn) {
-      verarbeiteAbos();
+    if (isLoggedIn && currentUserEmail) {
+      processSubscriptions(currentUserEmail);
     }
-  }, [isLoggedIn]);
-
-  const verarbeiteAbos = async () => {
-    try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
-      if (!currentUserJson) return;
-      const currentUser = JSON.parse(currentUserJson);
-      const userEmail = currentUser.email;
-
-      const gespeicherteAbosJson = await AsyncStorage.getItem('abos');
-      const abos = gespeicherteAbosJson ? JSON.parse(gespeicherteAbosJson) : [];
-      const userAbos = abos.filter(abo => abo.userEmail === userEmail);
-
-      const gespeicherteAusgabenJson = await AsyncStorage.getItem('ausgaben');
-      const ausgaben = gespeicherteAusgabenJson ? JSON.parse(gespeicherteAusgabenJson) : [];
-
-      const heute = new Date();
-      let hasChanged = false;
-
-      for (const abo of userAbos) {
-        const lastProcessed = new Date(abo.lastProcessed);
-        if (
-          heute.getFullYear() > lastProcessed.getFullYear() ||
-          heute.getMonth() > lastProcessed.getMonth()
-        ) {
-          const neueAusgabe = {
-            id: Date.now().toString() + abo.id,
-            betrag: abo.betrag,
-            kategorie: 'Abo',
-            notiz: `Abo: ${abo.name}`,
-            datum: heute.toISOString(),
-            userEmail: userEmail,
-          };
-          ausgaben.push(neueAusgabe);
-          abo.lastProcessed = heute.toISOString();
-          hasChanged = true;
-        }
-      }
-
-      if (hasChanged) {
-        await AsyncStorage.setItem('abos', JSON.stringify(abos));
-        await AsyncStorage.setItem('ausgaben', JSON.stringify(ausgaben));
-      }
-    } catch (error) {
-      console.error("Fehler bei der Verarbeitung der Abos:", error);
-    }
-  };
+  }, [isLoggedIn, currentUserEmail]);
 
   const checkLoginStatus = async () => {
     try {
       const loggedIn = await AsyncStorage.getItem('isLoggedIn');
       setIsLoggedIn(loggedIn === 'true');
+      const userJson = await AsyncStorage.getItem('currentUser');
+      if (userJson) {
+        setCurrentUserEmail(JSON.parse(userJson).email);
+      }
     } catch (error) {
       console.error('Fehler beim Prüfen des Login-Status:', error);
       setIsLoggedIn(false);
@@ -125,8 +86,11 @@ export default function App() {
     }
   };
 
-  const handleLogin = () => {
-    verarbeiteAbos();
+  const handleLogin = async () => {
+    const userJson = await AsyncStorage.getItem('currentUser');
+    if (userJson) {
+      setCurrentUserEmail(JSON.parse(userJson).email);
+    }
     setIsLoggedIn(true);
   };
 
@@ -135,6 +99,7 @@ export default function App() {
       await AsyncStorage.removeItem('isLoggedIn');
       await AsyncStorage.removeItem('currentUser');
       setIsLoggedIn(false);
+      setCurrentUserEmail(null);
     } catch (error) {
       console.error('Fehler beim Abmelden:', error);
     }

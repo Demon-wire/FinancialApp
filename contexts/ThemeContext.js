@@ -30,6 +30,19 @@ export const THEMES = {
     headerText: '#ffffff',
     shadow: '#00000040',
   },
+  darkPink: {
+    name: 'Dunkel Pink',
+    primary: '#FF69B4', // Hot Pink
+    background: '#1a1a1a', // Very dark gray
+    surface: '#2d2d2d', // Darker gray for cards/surfaces
+    text: '#ffffff', // White text
+    textSecondary: '#cccccc', // Light gray secondary text
+    border: '#444444', // Gray border
+    cardBackground: '#2d2d2d', // Same as surface
+    headerBackground: '#212121', // Slightly darker header
+    headerText: '#ffffff', // White header text
+    shadow: '#00000060', // Dark shadow
+  },
   midnight: {
     name: 'Mitternacht',
     primary: '#3b82f6',
@@ -59,7 +72,7 @@ export const THEMES = {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState('light'); // Standard-Theme ist jetzt blau
+  const [theme, setTheme] = useState('darkPink'); // Standard-Theme ist jetzt dunkel pink
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
