@@ -111,8 +111,7 @@ export default function AusgabenScreen() {
             <View style={styles.labelRow}>
               <Ionicons name="grid" size={20} color={currentTheme.primary} />
               <Text style={[styles.label, { color: currentTheme.text }]}>Kategorie</Text>
-            </V
-iew>
+            </View>
             <View style={styles.kategorienContainer}>
               {KATEGORIEN.map((kat) => {
                 const isSelected = kategorie === kat.name;
