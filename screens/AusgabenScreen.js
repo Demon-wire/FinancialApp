@@ -14,11 +14,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
+const KONTEN = [
+  { name: 'Girokonto', icon: 'card-outline' },
+  { name: 'Brieftasche', icon: 'wallet-outline' },
+  { name: 'Sparbuch', icon: 'book-outline' },
+  { name: 'Kreditkarte', icon: 'card' },
+]
+
 const KATEGORIEN = [
   { name: 'Miete', icon: 'home-outline', color: '#FF5722' },
   { name: 'Lebensmittel', icon: 'cart-outline', color: '#FFC107' },
   { name: 'Transport', icon: 'bus-outline', color: '#03A9F4' },
   { name: 'Freizeit', icon: 'game-controller-outline', color: '#4CAF50' },
+  { name: 'Haushalt', icon: 'basket-outline', color: '#673AB7' },
+  { name: 'Gesundheit', icon: 'medkit-outline', color: '#E91E63' },
+  { name: 'Bildung', icon: 'school-outline', color: '#009688' },
+  { name: 'Kleidung', icon: 'shirt-outline', color: '#9C27B0' },
+  { name: 'Versicherung', icon: 'shield-checkmark-outline', color: '#3F51B5' },
   { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
 ];
 
@@ -27,6 +39,7 @@ export default function AusgabenScreen() {
   const [betrag, setBetrag] = useState('');
   const [kategorie, setKategorie] = useState('Miete');
   const [notiz, setNotiz] = useState('');
+  const [konto, setKonto] = useState('Girokonto');
 
   const speichereAusgabe = async () => {
     if (!betrag || parseFloat(betrag) <= 0) {
@@ -48,6 +61,7 @@ export default function AusgabenScreen() {
         betrag: parseFloat(betrag),
         kategorie: kategorie,
         notiz: notiz,
+        konto: konto,
         datum: new Date().toISOString(),
         userEmail: userEmail,
       };
@@ -61,6 +75,7 @@ export default function AusgabenScreen() {
       setBetrag('');
       setNotiz('');
       setKategorie('Miete');
+      setKonto('Girokonto');
     } catch (error) {
       Alert.alert('Fehler', 'Ausgabe konnte nicht gespeichert werden.');
       console.error(error);
@@ -103,6 +118,50 @@ export default function AusgabenScreen() {
                 value={betrag}
                 onChangeText={setBetrag}
               />
+            </View>
+          </View>
+
+          {/* Konten */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Ionicons name="server-outline" size={20} color={currentTheme.primary} />
+              <Text style={[styles.label, { color: currentTheme.text }]}>Konto</Text>
+            </View>
+            <View style={styles.kategorienContainer}>
+              {KONTEN.map((k) => {
+                const isSelected = konto === k.name;
+                return (
+                  <TouchableOpacity
+                    key={k.name}
+                    style={[
+                      styles.kategorieButton,
+                      {
+                        backgroundColor: isSelected ? currentTheme.primary : currentTheme.surface,
+                        borderColor: isSelected ? currentTheme.primary : currentTheme.border,
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setKonto(k.name)}
+                  >
+                    <Ionicons 
+                      name={k.icon} 
+                      size={24} 
+                      color={isSelected ? '#fff' : currentTheme.primary} 
+                    />
+                    <Text
+                      style={[
+                        styles.kategorieText,
+                        {
+                          color: isSelected ? '#fff' : currentTheme.text,
+                          fontWeight: isSelected ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {k.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 

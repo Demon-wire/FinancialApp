@@ -10,27 +10,48 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
-const KATEGORIE_ICONS = {
-  // Einnahmen
-  'Gehalt': 'briefcase',
-  'Nebentätigkeit': 'cash',
-  'Investitionen': 'trending-up',
-  'Geschenk': 'gift',
-  // Ausgaben
-  'Miete': 'home',
-  'Lebensmittel': 'cart',
-  'Transport': 'bus',
-  'Freizeit': 'game-controller',
-  'Abo': 'repeat',
-  'Sonstiges': 'ellipse',
-};
+const KATEGORIEN_EINNAHMEN = [
+  { name: 'Gehalt', icon: 'briefcase-outline', color: '#2196F3' },
+  { name: 'Nebentätigkeit', icon: 'cash-outline', color: '#4CAF50' },
+  { name: 'Investitionen', icon: 'trending-up-outline', color: '#FF9800' },
+  { name: 'Dividenden', icon: 'logo-bitcoin', color: '#607D8B' },
+  { name: 'Zinsen', icon: 'analytics-outline', color: '#795548' },
+  { name: 'Mieteinnahmen', icon: 'home-outline', color: '#FF5722' },
+  { name: 'Rückerstattung', icon: 'arrow-undo-outline', color: '#00BCD4' },
+  { name: 'Geschenk', icon: 'gift-outline', color: '#E91E63' },
+  { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
+];
+
+const KATEGORIEN_AUSGABEN = [
+  { name: 'Miete', icon: 'home-outline', color: '#FF5722' },
+  { name: 'Lebensmittel', icon: 'cart-outline', color: '#FFC107' },
+  { name: 'Transport', icon: 'bus-outline', color: '#03A9F4' },
+  { name: 'Freizeit', icon: 'game-controller-outline', color: '#4CAF50' },
+  { name: 'Haushalt', icon: 'basket-outline', color: '#673AB7' },
+  { name: 'Gesundheit', icon: 'medkit-outline', color: '#E91E63' },
+  { name: 'Bildung', icon: 'school-outline', color: '#009688' },
+  { name: 'Kleidung', icon: 'shirt-outline', color: '#9C27B0' },
+  { name: 'Versicherung', icon: 'shield-checkmark-outline', color: '#3F51B5' },
+  { name: 'Abo', icon: 'repeat-outline', color: '#9E9E9E' },
+  { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
+];
+
+function getCategoryDetails(categoryName, type) {
+    let categories = type === 'einnahmen' ? KATEGORIEN_EINNAHMEN : KATEGORIEN_AUSGABEN;
+    const foundCategory = categories.find(cat => cat.name === categoryName);
+    const result = foundCategory || { name: categoryName, icon: 'ellipse-outline', color: '#9E9E9E' };
+    console.log(`StatistikScreen: getCategoryDetails for ${categoryName} (${type}):`, result); // Debug log
+    return result;
+}
 
 export default function StatistikScreen() {
   const { currentTheme } = useTheme();
   const [einnahmen, setEinnahmen] = useState([]);
   const [ausgaben, setAusgaben] = useState([]);
-  const [zeitraum, setZeitraum] = useState('monat');
+  const [zeitraum, setZeitraum] = useState('tag');
   const [typ, setTyp] = useState('einnahmen'); // 'einnahmen' oder 'ausgaben'
+  const [selectedAccount, setSelectedAccount] = useState('Alle Konten'); // New state for selected account
+  const [availableAccounts, setAvailableAccounts] = useState(['Alle Konten']); // New state for available accounts
 
   useEffect(() => {
     ladeDaten();
@@ -44,46 +65,72 @@ export default function StatistikScreen() {
       if (!currentUserJson) {
         setEinnahmen([]);
         setAusgaben([]);
+        setAvailableAccounts(['Alle Konten']);
         return;
       }
       const currentUser = JSON.parse(currentUserJson);
       const userEmail = currentUser.email;
 
+      let allAccounts = new Set(['Alle Konten']);
+
       // Lade Einnahmen
       const gespeicherteEinnahmen = await AsyncStorage.getItem('einnahmen');
+      let einnahmenListe = [];
       if (gespeicherteEinnahmen) {
         const alleEinnahmen = JSON.parse(gespeicherteEinnahmen);
-        const einnahmenListe = alleEinnahmen.filter(
-          (e) => e.userEmail === userEmail
-        );
+        einnahmenListe = alleEinnahmen
+          .filter((e) => e.userEmail === userEmail)
+          .map(e => {
+              if (e.konto) allAccounts.add(e.konto);
+              return {
+                  ...e,
+                  icon: getCategoryDetails(e.kategorie, 'einnahmen').icon,
+                  color: getCategoryDetails(e.kategorie, 'einnahmen').color,
+              };
+          });
         setEinnahmen(einnahmenListe);
+        console.log('StatistikScreen: Geladene Einnahmen (mit Details):', einnahmenListe);
       } else {
         setEinnahmen([]);
       }
 
       // Lade Ausgaben
       const gespeicherteAusgaben = await AsyncStorage.getItem('ausgaben');
+      let ausgabenListe = [];
       if (gespeicherteAusgaben) {
         const alleAusgaben = JSON.parse(gespeicherteAusgaben);
-        const ausgabenListe = alleAusgaben.filter(
-          (a) => a.userEmail === userEmail
-        );
+        ausgabenListe = alleAusgaben
+          .filter((a) => a.userEmail === userEmail)
+          .map(a => {
+              if (a.konto) allAccounts.add(a.konto);
+              return {
+                  ...a,
+                  icon: getCategoryDetails(a.kategorie, 'ausgaben').icon,
+                  color: getCategoryDetails(a.kategorie, 'ausgaben').color,
+              };
+          });
         setAusgaben(ausgabenListe);
+        console.log('StatistikScreen: Geladene Ausgaben (mit Details):', ausgabenListe);
       } else {
         setAusgaben([]);
       }
+      setAvailableAccounts(Array.from(allAccounts));
     } catch (error) {
       console.error('Fehler beim Laden der Daten:', error);
       setEinnahmen([]);
       setAusgaben([]);
+      setAvailableAccounts(['Alle Konten']);
     }
   };
 
-  const filtereNachZeitraum = (transaktionen) => {
+  const filtereNachZeitraumUndKonto = (transaktionen) => {
     const jetzt = new Date();
     let startDatum;
 
     switch (zeitraum) {
+      case 'tag':
+        startDatum = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+        break;
       case 'woche':
         startDatum = new Date(jetzt.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
@@ -94,26 +141,32 @@ export default function StatistikScreen() {
         startDatum = new Date(jetzt.getFullYear(), 0, 1);
         break;
       default:
-        startDatum = new Date(jetzt.getFullYear(), jetzt.getMonth(), 1);
+        startDatum = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
     }
 
     return transaktionen.filter((t) => {
       const transaktionsDatum = new Date(t.datum);
-      return transaktionsDatum >= startDatum;
+      const matchesTimeframe = transaktionsDatum >= startDatum;
+      const matchesAccount = selectedAccount === 'Alle Konten' || t.konto === selectedAccount;
+      return matchesTimeframe && matchesAccount;
     });
   };
 
   const berechneStatistik = () => {
     const transaktionen = typ === 'einnahmen' ? einnahmen : ausgaben;
-    const gefilterteTransaktionen = filtereNachZeitraum(transaktionen);
+    const gefilterteTransaktionen = filtereNachZeitraumUndKonto(transaktionen); // Use new filtering function
     const gesamt = gefilterteTransaktionen.reduce((sum, t) => sum + t.betrag, 0);
 
     const nachKategorie = {};
     gefilterteTransaktionen.forEach((t) => {
       if (nachKategorie[t.kategorie]) {
-        nachKategorie[t.kategorie] += t.betrag;
+        nachKategorie[t.kategorie].betrag += t.betrag;
       } else {
-        nachKategorie[t.kategorie] = t.betrag;
+        nachKategorie[t.kategorie] = {
+            betrag: t.betrag,
+            icon: t.icon,
+            color: t.color,
+        };
       }
     });
 
@@ -132,34 +185,36 @@ export default function StatistikScreen() {
   };
 
   const zeitraumLabels = {
+    tag: 'Heute',
     woche: 'Letzte Woche',
     monat: 'Dieser Monat',
     jahr: 'Dieses Jahr',
   };
 
   const zeitraumIcons = {
+    tag: 'calendar-outline',
     woche: 'calendar-outline',
     monat: 'calendar',
     jahr: 'calendar-number',
   };
 
-  const gefilterteTransaktionen = filtereNachZeitraum(typ === 'einnahmen' ? einnahmen : ausgaben);
+  const gefilterteTransaktionen = filtereNachZeitraumUndKonto(typ === 'einnahmen' ? einnahmen : ausgaben); // Use new filtering function
   const sortedKategorien = Object.entries(nachKategorie)
-    .sort((a, b) => b[1] - a[1]);
+    .sort((a, b) => b[1].betrag - a[1].betrag); // Sort by betrag
 
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: currentTheme.background }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header mit Zeitraum-Auswahl */}
+      {/* Header mit Zeitraum-Auswahl und Konto-Auswahl */}
       <View style={[styles.headerCard, { backgroundColor: currentTheme.cardBackground }]}>
         <View style={styles.headerTitleRow}>
           <Ionicons name="stats-chart" size={32} color={currentTheme.primary} />
           <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Statistik</Text>
         </View>
         <View style={styles.zeitraumButtons}>
-          {['woche', 'monat', 'jahr'].map((z) => (
+          {['tag', 'woche', 'monat', 'jahr'].map((z) => (
             <TouchableOpacity
               key={z}
               style={[
@@ -187,11 +242,43 @@ export default function StatistikScreen() {
                   },
                 ]}
               >
-                {z === 'woche' ? 'Woche' : z === 'monat' ? 'Monat' : 'Jahr'}
+                {z === 'tag' ? 'Tag' : z === 'woche' ? 'Woche' : z === 'monat' ? 'Monat' : 'Jahr'}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Konto-Auswahl */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountButtonsContainer}>
+          {availableAccounts.map((accountName) => (
+            <TouchableOpacity
+              key={accountName}
+              style={[
+                styles.accountButton,
+                {
+                  backgroundColor: selectedAccount === accountName ? currentTheme.primary : currentTheme.surface,
+                  borderColor: currentTheme.border,
+                },
+                selectedAccount === accountName && styles.accountButtonActive,
+              ]}
+              onPress={() => setSelectedAccount(accountName)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.accountButtonText,
+                  {
+                    color: selectedAccount === accountName ? '#fff' : currentTheme.text,
+                    fontWeight: selectedAccount === accountName ? '600' : '400',
+                  },
+                ]}
+              >
+                {accountName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <View style={styles.typButtons}>
           <TouchableOpacity
             style={[styles.typButton, typ === 'einnahmen' && { backgroundColor: currentTheme.primary }]}
@@ -204,15 +291,13 @@ export default function StatistikScreen() {
             onPress={() => setTyp('ausgaben')}
           >
             <Text style={[styles.typButtonText, typ === 'ausgaben' && { color: '#fff' }]}>Ausgaben</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.statistikContainer}>
-        {/* Gesamt-Box */}
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.statistikContainer}>
+                    {/* ... Gesamt-Box ... */}
         <View style={[styles.gesamtBox, { backgroundColor: currentTheme.primary }]}>
           <Ionicons name="wallet" size={40} color="#fff" />
-          <Text style={styles.gesamtLabel}>{zeitraumLabels[zeitraum]} ({typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'})</Text>
+          <Text style={styles.gesamtLabel}>{zeitraumLabels[zeitraum]} ({selectedAccount === 'Alle Konten' ? 'Alle Konten' : selectedAccount}) ({typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'})</Text>
           <Text style={styles.gesamtBetrag}>{gesamt.toFixed(2)} €</Text>
           <View style={styles.gesamtInfoRow}>
             <Ionicons name="receipt-outline" size={16} color="#fff" style={{ opacity: 0.9 }} />
@@ -230,29 +315,29 @@ export default function StatistikScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="bar-chart-outline" size={48} color={currentTheme.textSecondary} />
               <Text style={[styles.keineDaten, { color: currentTheme.textSecondary }]}>
-                Keine {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'} in diesem Zeitraum
+                Keine {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'} in diesem Zeitraum für {selectedAccount}
               </Text>
             </View>
           ) : (
-            sortedKategorien.map(([kategorie, betrag], index) => {
+            sortedKategorien.map(([kategorieName, { betrag, icon, color }], index) => {
               const prozent = gesamt > 0 ? (betrag / gesamt) * 100 : 0;
               return (
-                <View key={kategorie} style={styles.kategorieItem}>
+                <View key={kategorieName} style={styles.kategorieItem}>
                   <View style={styles.kategorieHeader}>
-                    <View style={[styles.kategorieIconContainer, { backgroundColor: `${currentTheme.primary}20` }]}>
+                    <View style={[styles.kategorieIconContainer, { backgroundColor: `${color}20` }]}>
                       <Ionicons 
-                        name={KATEGORIE_ICONS[kategorie] || 'ellipse'} 
+                        name={icon} 
                         size={20} 
-                        color={currentTheme.primary} 
+                        color={color} 
                       />
                     </View>
                     <View style={styles.kategorieInfo}>
-                      <Text style={[styles.kategorieName, { color: currentTheme.text }]}>{kategorie}</Text>
+                      <Text style={[styles.kategorieName, { color: currentTheme.text }]}>{kategorieName}</Text>
                       <Text style={[styles.kategorieProzent, { color: currentTheme.textSecondary }]}>
                         {prozent.toFixed(1)}%
                       </Text>
                     </View>
-                    <Text style={[styles.kategorieBetrag, { color: currentTheme.primary }]}>
+                    <Text style={[styles.kategorieBetrag, { color: color }]}>
                       {betrag.toFixed(2)} €
                     </Text>
                   </View>
@@ -262,7 +347,7 @@ export default function StatistikScreen() {
                         styles.progressFill, 
                         { 
                           width: `${prozent}%`, 
-                          backgroundColor: currentTheme.primary 
+                          backgroundColor: color 
                         }
                       ]} 
                     />
@@ -283,7 +368,7 @@ export default function StatistikScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={48} color={currentTheme.textSecondary} />
               <Text style={[styles.keineDaten, { color: currentTheme.textSecondary }]}>
-                Noch keine {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'} erfasst
+                Noch keine {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'} erfasst für {selectedAccount}
               </Text>
             </View>
           ) : (
@@ -296,11 +381,11 @@ export default function StatistikScreen() {
                   style={[styles.einnahmeItem, { borderBottomColor: currentTheme.border }]}
                 >
                   <View style={styles.einnahmeLeft}>
-                    <View style={[styles.einnahmeIconContainer, { backgroundColor: `${currentTheme.primary}20` }]}>
+                    <View style={[styles.einnahmeIconContainer, { backgroundColor: `${transaktion.color}20` }]}>
                       <Ionicons 
-                        name={KATEGORIE_ICONS[transaktion.kategorie] || 'ellipse'} 
+                        name={transaktion.icon} 
                         size={20} 
-                        color={currentTheme.primary} 
+                        color={transaktion.color} 
                       />
                     </View>
                     <View style={styles.einnahmeInfo}>
@@ -323,12 +408,13 @@ export default function StatistikScreen() {
                       </View>
                     </View>
                   </View>
-                  <Text style={[styles.einnahmeBetrag, { color: typ === 'einnahmen' ? currentTheme.primary : 'red' }]}>
+                  <Text style={[styles.einnahmeBetrag, { color: transaktion.typ === 'einnahmen' ? transaktion.color : transaktion.color }]}>
                     {typ === 'einnahmen' ? '+' : '-'}{transaktion.betrag.toFixed(2)} €
                   </Text>
                 </View>
               ))
           )}
+        </View>
         </View>
       </View>
     </ScrollView>
@@ -380,6 +466,28 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   zeitraumButtonText: {
+    fontSize: 14,
+  },
+  accountButtonsContainer: {
+    flexDirection: 'row',
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  accountButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 10,
+  },
+  accountButtonActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  accountButtonText: {
     fontSize: 14,
   },
   typButtons: {

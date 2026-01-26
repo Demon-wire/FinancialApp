@@ -12,10 +12,19 @@ export default function TransactionsScreen() {
   return (
     <Tab.Navigator
       screenOptions={{
-        tabBarActiveTintColor: currentTheme.primary,
-        tabBarInactiveTintColor: 'gray',
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          color: 'blue', // Force blue color for text
+          fontSize: 18,
+          backgroundColor: 'yellow', // Add background to see if it takes space
+          height: 30, // Force a height
+          width: 100, // Force a width
+          textAlign: 'center', // Center text
+        },
         tabBarStyle: {
           backgroundColor: currentTheme.surface,
+          // Add a height to the tab bar itself to ensure space for labels
+          height: 60,
         },
         tabBarIndicatorStyle: {
           backgroundColor: currentTheme.primary,

@@ -12,8 +12,11 @@ import StatistikScreen from './screens/StatistikScreen';
 import EinstellungenScreen from './screens/EinstellungenScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
-
 import AbosScreen from './screens/AbosScreen';
+import AlleTransaktionenScreen from './screens/AlleTransaktionenScreen';
+import AnleitungScreen from './screens/AnleitungScreen'; // Import the new screen
+import KontostandScreen from './screens/KontostandScreen';
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -29,10 +32,16 @@ function MainTabs({ onLogout }) {
 
           if (route.name === 'Transaktionen') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
+          } else if (route.name === 'Alle Transaktionen') {
+            iconName = focused ? 'list' : 'list-outline';
+          } else if (route.name === 'Anleitung') {
+            iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Statistik') {
             iconName = focused ? 'stats-chart' : 'stats-chart-outline';
           } else if (route.name === 'Abos') {
             iconName = focused ? 'repeat' : 'repeat-outline';
+          } else if (route.name === 'Kontostand') {
+            iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Einstellungen') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
@@ -66,8 +75,11 @@ function MainTabs({ onLogout }) {
       })}
     >
       <Tab.Screen name="Transaktionen" component={TransactionsScreen} />
-      <Tab.Screen name="Statistik" component={StatistikScreen} />
+      <Tab.Screen name="Alle Transaktionen" component={AlleTransaktionenScreen} />
+      <Tab.Screen name="Kontostand" component={KontostandScreen} />
       <Tab.Screen name="Abos" component={AbosScreen} />
+      <Tab.Screen name="Statistik" component={StatistikScreen} />
+      <Tab.Screen name="Anleitung" component={AnleitungScreen} />
       <Tab.Screen name="Einstellungen">
         {(props) => <EinstellungenScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
@@ -101,7 +113,7 @@ export default function App() {
       const userAbos = abos.filter(abo => abo.userEmail === userEmail);
 
       const gespeicherteAusgabenJson = await AsyncStorage.getItem('ausgaben');
-      const ausgaben = gespeicherteAusgabenJson ? JSON.parse(gespeicherteAusgabenJson) : [];
+      let ausgaben = gespeicherteAusgabenJson ? JSON.parse(gespeicherteAusgabenJson) : [];
 
       const heute = new Date();
       let hasChanged = false;
@@ -117,6 +129,7 @@ export default function App() {
             betrag: abo.betrag,
             kategorie: 'Abo',
             notiz: `Abo: ${abo.name}`,
+            konto: abo.konto || 'Girokonto', // Fallback
             datum: heute.toISOString(),
             userEmail: userEmail,
           };
@@ -127,8 +140,13 @@ export default function App() {
       }
 
       if (hasChanged) {
+        const uniqueAusgaben = Array.from(new Set(ausgaben.map(a => a.id)))
+          .map(id => {
+            return ausgaben.find(a => a.id === id)
+          });
+
         await AsyncStorage.setItem('abos', JSON.stringify(abos));
-        await AsyncStorage.setItem('ausgaben', JSON.stringify(ausgaben));
+        await AsyncStorage.setItem('ausgaben', JSON.stringify(uniqueAusgaben));
       }
     } catch (error) {
       console.error("Fehler bei der Verarbeitung der Abos:", error);
