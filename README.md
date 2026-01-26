@@ -59,4 +59,4 @@ FinanzApp/
 
 Um die App auf einem echten Gerät zu testen:
 1. Installiere die Expo Go App auf deinem Smartphone
-2. Scanne den QR-Code, der beim Starten der App angezeigt wird
+2. Scanne den QR-Code, der beim Starten der App angezeigt wird.

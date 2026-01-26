@@ -14,10 +14,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
+const KONTEN = [
+  { name: 'Girokonto', icon: 'card-outline' },
+  { name: 'Brieftasche', icon: 'wallet-outline' },
+  { name: 'Sparbuch', icon: 'book-outline' },
+  { name: 'Kreditkarte', icon: 'card' },
+]
+
 const KATEGORIEN = [
   { name: 'Gehalt', icon: 'briefcase-outline', color: '#2196F3' },
   { name: 'Nebentätigkeit', icon: 'cash-outline', color: '#4CAF50' },
   { name: 'Investitionen', icon: 'trending-up-outline', color: '#FF9800' },
+  { name: 'Dividenden', icon: 'logo-bitcoin', color: '#607D8B' },
+  { name: 'Zinsen', icon: 'analytics-outline', color: '#795548' },
+  { name: 'Mieteinnahmen', icon: 'home-outline', color: '#FF5722' },
+  { name: 'Rückerstattung', icon: 'arrow-undo-outline', color: '#00BCD4' },
   { name: 'Geschenk', icon: 'gift-outline', color: '#E91E63' },
   { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
 ];
@@ -27,6 +38,7 @@ export default function EinnahmenScreen() {
   const [betrag, setBetrag] = useState('');
   const [kategorie, setKategorie] = useState('Gehalt');
   const [notiz, setNotiz] = useState('');
+  const [konto, setKonto] = useState('Girokonto');
 
   const speichereEinnahme = async () => {
     if (!betrag || parseFloat(betrag) <= 0) {
@@ -48,6 +60,7 @@ export default function EinnahmenScreen() {
         betrag: parseFloat(betrag),
         kategorie: kategorie,
         notiz: notiz,
+        konto: konto,
         datum: new Date().toISOString(),
         userEmail: userEmail,
       };
@@ -61,6 +74,7 @@ export default function EinnahmenScreen() {
       setBetrag('');
       setNotiz('');
       setKategorie('Gehalt');
+      setKonto('Girokonto');
     } catch (error) {
       Alert.alert('Fehler', 'Einnahme konnte nicht gespeichert werden.');
       console.error(error);
@@ -103,6 +117,50 @@ export default function EinnahmenScreen() {
                 value={betrag}
                 onChangeText={setBetrag}
               />
+            </View>
+          </View>
+          
+          {/* Konten */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Ionicons name="server-outline" size={20} color={currentTheme.primary} />
+              <Text style={[styles.label, { color: currentTheme.text }]}>Konto</Text>
+            </View>
+            <View style={styles.kategorienContainer}>
+              {KONTEN.map((k) => {
+                const isSelected = konto === k.name;
+                return (
+                  <TouchableOpacity
+                    key={k.name}
+                    style={[
+                      styles.kategorieButton,
+                      {
+                        backgroundColor: isSelected ? currentTheme.primary : currentTheme.surface,
+                        borderColor: isSelected ? currentTheme.primary : currentTheme.border,
+                        borderWidth: 2,
+                      },
+                    ]}
+                    onPress={() => setKonto(k.name)}
+                  >
+                    <Ionicons 
+                      name={k.icon} 
+                      size={24} 
+                      color={isSelected ? '#fff' : currentTheme.primary} 
+                    />
+                    <Text
+                      style={[
+                        styles.kategorieText,
+                        {
+                          color: isSelected ? '#fff' : currentTheme.text,
+                          fontWeight: isSelected ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {k.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
