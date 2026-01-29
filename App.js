@@ -14,9 +14,9 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import AbosScreen from './screens/AbosScreen';
 import AlleTransaktionenScreen from './screens/AlleTransaktionenScreen';
-import AnleitungScreen from './screens/AnleitungScreen'; // Import the new screen
+import AnleitungScreen from './screens/AnleitungScreen';
 import KontostandScreen from './screens/KontostandScreen';
-
+import EditTransactionScreen from './screens/EditTransactionScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -87,6 +87,16 @@ function MainTabs({ onLogout }) {
   );
 }
 
+const AppStack = ({ onLogout }) => {
+  const { currentTheme } = useTheme();
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="EditTransaction" component={EditTransactionScreen} options={{ title: 'Transaktion bearbeiten', headerStyle: { backgroundColor: currentTheme.headerBackground }, headerTintColor: currentTheme.headerText }}/>
+    </Stack.Navigator>
+  )
+}
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,48 +118,46 @@ export default function App() {
       const currentUser = JSON.parse(currentUserJson);
       const userEmail = currentUser.email;
 
-      const gespeicherteAbosJson = await AsyncStorage.getItem('abos');
-      const abos = gespeicherteAbosJson ? JSON.parse(gespeicherteAbosJson) : [];
-      const userAbos = abos.filter(abo => abo.userEmail === userEmail);
+      const abosJson = await AsyncStorage.getItem('abos');
+      if (!abosJson) return;
+      let abos = JSON.parse(abosJson);
 
-      const gespeicherteAusgabenJson = await AsyncStorage.getItem('ausgaben');
-      let ausgaben = gespeicherteAusgabenJson ? JSON.parse(gespeicherteAusgabenJson) : [];
+      const ausgabenJson = await AsyncStorage.getItem('ausgaben');
+      let ausgaben = ausgabenJson ? JSON.parse(ausgabenJson) : [];
 
       const heute = new Date();
-      let hasChanged = false;
+      let hatGeaendert = false;
 
-      for (const abo of userAbos) {
+      const neueAbos = abos.map(abo => {
+        if (abo.userEmail !== userEmail) return abo;
+
         const lastProcessed = new Date(abo.lastProcessed);
-        if (
-          heute.getFullYear() > lastProcessed.getFullYear() ||
-          heute.getMonth() > lastProcessed.getMonth()
-        ) {
+        // Wenn letztes Mal in einem anderen Monat verarbeitet
+        if (lastProcessed.getMonth() !== heute.getMonth() || lastProcessed.getFullYear() !== heute.getFullYear()) {
+          // Neue Ausgabe erstellen
           const neueAusgabe = {
-            id: Date.now().toString() + abo.id,
+            id: Date.now().toString() + Math.random().toString(),
             betrag: abo.betrag,
             kategorie: 'Abo',
-            notiz: `Abo: ${abo.name}`,
-            konto: abo.konto || 'Girokonto', // Fallback
+            notiz: `Abonnement: ${abo.name}`,
+            konto: 'Girokonto',
             datum: heute.toISOString(),
             userEmail: userEmail,
+            typ: 'ausgabe',
           };
           ausgaben.push(neueAusgabe);
-          abo.lastProcessed = heute.toISOString();
-          hasChanged = true;
+          hatGeaendert = true;
+          return { ...abo, lastProcessed: heute.toISOString() };
         }
-      }
+        return abo;
+      });
 
-      if (hasChanged) {
-        const uniqueAusgaben = Array.from(new Set(ausgaben.map(a => a.id)))
-          .map(id => {
-            return ausgaben.find(a => a.id === id)
-          });
-
-        await AsyncStorage.setItem('abos', JSON.stringify(abos));
-        await AsyncStorage.setItem('ausgaben', JSON.stringify(uniqueAusgaben));
+      if (hatGeaendert) {
+        await AsyncStorage.setItem('ausgaben', JSON.stringify(ausgaben));
+        await AsyncStorage.setItem('abos', JSON.stringify(neueAbos));
       }
     } catch (error) {
-      console.error("Fehler bei der Verarbeitung der Abos:", error);
+      console.error('Fehler bei der Abo-Verarbeitung:', error);
     }
   };
 
@@ -159,14 +167,12 @@ export default function App() {
       setIsLoggedIn(loggedIn === 'true');
     } catch (error) {
       console.error('Fehler beim Prüfen des Login-Status:', error);
-      setIsLoggedIn(false);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleLogin = () => {
-    verarbeiteAbos();
     setIsLoggedIn(true);
   };
 
@@ -176,19 +182,19 @@ export default function App() {
       await AsyncStorage.removeItem('currentUser');
       setIsLoggedIn(false);
     } catch (error) {
-      console.error('Fehler beim Abmelden:', error);
+      console.error('Fehler beim Logout:', error);
     }
   };
 
   if (isLoading) {
-    return null; // Oder ein Loading-Screen
+    return null; // Or a loading-screen
   }
 
   return (
     <ThemeProvider>
       <NavigationContainer>
         {isLoggedIn ? (
-          <MainTabs onLogout={handleLogout} />
+          <AppStack onLogout={handleLogout} />
         ) : (
           <Stack.Navigator
             screenOptions={{

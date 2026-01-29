@@ -63,6 +63,7 @@ export default function EinnahmenScreen() {
         konto: konto,
         datum: new Date().toISOString(),
         userEmail: userEmail,
+        typ: 'einnahme',
       };
 
       const gespeicherteEinnahmen = await AsyncStorage.getItem('einnahmen');
