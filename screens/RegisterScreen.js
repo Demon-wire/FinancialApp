@@ -12,7 +12,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import bcrypt from 'bcrypt-react-native'; // Import bcrypt
+import bcrypt from 'bcryptjs';
+import logger from '../utils/logger';
+
+const CTX = 'Register';
 
 export default function RegisterScreen({ navigation, onRegister }) {
   const [name, setName] = useState('');
@@ -30,12 +33,12 @@ export default function RegisterScreen({ navigation, onRegister }) {
 
   const handleRegister = async () => {
     if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Fehler', 'Bitte füllen Sie alle Felder aus.');
+      Alert.alert('Fehler', 'Bitte fuelle alle Felder aus.');
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Fehler', 'Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+      Alert.alert('Fehler', 'Bitte gib eine gueltige E-Mail-Adresse ein.');
       return;
     }
 
@@ -45,46 +48,61 @@ export default function RegisterScreen({ navigation, onRegister }) {
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Fehler', 'Die Passwörter stimmen nicht überein.');
+      Alert.alert('Fehler', 'Die Passwoerter stimmen nicht ueberein.');
       return;
     }
 
     setLoading(true);
+    logger.info(CTX, `Register attempt: ${name} (${email})`);
+
     try {
+      // Step 1: Load existing users
       const usersJson = await AsyncStorage.getItem('users');
       const users = usersJson ? JSON.parse(usersJson) : [];
+      logger.debug(CTX, `Existing users: ${users.length}`);
 
+      // Step 2: Check for duplicates
       if (users.find((u) => u.email === email.toLowerCase())) {
+        logger.warn(CTX, `Duplicate email: ${email}`);
         Alert.alert('Fehler', 'Diese E-Mail-Adresse ist bereits registriert.');
         setLoading(false);
         return;
       }
 
-      // Hash the password
-      const hashedPassword = await bcrypt.hash(password, 10); // 10 salt rounds
+      // Step 3: Hash password
+      logger.debug(CTX, 'Hashing password with bcryptjs...');
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      logger.debug(CTX, 'Password hashed successfully');
 
+      // Step 4: Create user
       const newUser = {
         id: Date.now().toString(),
         name: name.trim(),
         email: email.toLowerCase().trim(),
-        password: hashedPassword, // Store hashed password
+        password: hashedPassword,
         createdAt: new Date().toISOString(),
       };
 
       users.push(newUser);
       await AsyncStorage.setItem('users', JSON.stringify(users));
+      logger.info(CTX, `User created: ${newUser.name} (${newUser.email})`);
 
+      // Step 5: Auto-login
       await AsyncStorage.setItem('currentUser', JSON.stringify({
         email: newUser.email,
         name: newUser.name,
       }));
       await AsyncStorage.setItem('isLoggedIn', 'true');
 
+      logger.info(CTX, 'Register SUCCESS - auto-login complete');
       Alert.alert('Erfolg', `Willkommen, ${newUser.name}!`);
       onRegister();
     } catch (error) {
-      Alert.alert('Fehler', 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
-      console.error(error);
+      logger.error(CTX, 'Register CRASHED', error.message);
+      Alert.alert(
+        'Registrierung Fehler',
+        `Etwas ist schiefgelaufen:\n${error.message}\n\nCheck die Console fuer Details.`
+      );
     } finally {
       setLoading(false);
     }
@@ -100,9 +118,9 @@ export default function RegisterScreen({ navigation, onRegister }) {
           <View style={styles.iconContainer}>
             <Ionicons name="person-add" size={80} color="#2196F3" />
           </View>
-          
+
           <Text style={styles.title}>Registrieren</Text>
-          <Text style={styles.subtitle}>Erstellen Sie ein neues Konto</Text>
+          <Text style={styles.subtitle}>Erstelle ein neues Konto</Text>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
@@ -155,7 +173,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
               <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Passwort bestätigen"
+                placeholder="Passwort bestaetigen"
                 placeholderTextColor="#999"
                 secureTextEntry={!showConfirmPassword}
                 value={confirmPassword}

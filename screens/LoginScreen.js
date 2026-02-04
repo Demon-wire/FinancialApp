@@ -13,7 +13,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
-import bcrypt from 'bcrypt-react-native'; // Import bcrypt
+import bcrypt from 'bcryptjs';
+import logger from '../utils/logger';
+
+const CTX = 'Login';
 
 export default function LoginScreen({ navigation, onLogin }) {
   const [email, setEmail] = useState('');
@@ -24,94 +27,109 @@ export default function LoginScreen({ navigation, onLogin }) {
 
   useEffect(() => {
     (async () => {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      if (compatible) {
-        const enrolled = await LocalAuthentication.isEnrolledAsync();
-        if (enrolled) {
-          setIsBiometricSupported(true);
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        if (compatible) {
+          const enrolled = await LocalAuthentication.isEnrolledAsync();
+          if (enrolled) {
+            setIsBiometricSupported(true);
+            logger.info(CTX, 'Biometric authentication available');
+          }
         }
+      } catch (e) {
+        logger.warn(CTX, 'Biometric check failed', e.message);
       }
     })();
   }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Fehler', 'Bitte füllen Sie alle Felder aus.');
+      Alert.alert('Fehler', 'Bitte fuelle alle Felder aus.');
       return;
     }
 
     setLoading(true);
-    try {
-      console.log('handleLogin: Attempting to log in with email:', email);
+    logger.info(CTX, `Login attempt for: ${email}`);
 
+    try {
+      // Step 1: Load users
       const usersJson = await AsyncStorage.getItem('users');
       const users = usersJson ? JSON.parse(usersJson) : [];
-      console.log('handleLogin: Retrieved users from AsyncStorage:', users);
+      logger.debug(CTX, `Users in storage: ${users.length}`);
 
-      const user = users.find(
-        (u) => u.email === email.toLowerCase()
-      );
-      console.log('handleLogin: Found user:', user);
+      // Step 2: Find user by email
+      const user = users.find((u) => u.email === email.toLowerCase());
 
-      if (user) {
-        console.log('handleLogin: User found. Checking password.');
-        console.log('handleLogin: User password from storage (first 10 chars):', user.password ? user.password.substring(0, 10) + '...' : 'undefined');
-        console.log('handleLogin: Provided password (first 10 chars):', password ? password.substring(0, 10) + '...' : 'undefined');
+      if (!user) {
+        logger.warn(CTX, `No user found for email: ${email}`);
+        Alert.alert('Fehler', 'E-Mail oder Passwort ist falsch.');
+        return;
+      }
 
-        let passwordMatch = false;
-        // Check if the stored password is a bcrypt hash
-        if (user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$') || user.password.startsWith('$2y$'))) {
-          console.log('handleLogin: Stored password appears to be a bcrypt hash. Comparing...');
-          passwordMatch = await bcrypt.compare(password, user.password);
-        } else {
-          console.log('handleLogin: Stored password is NOT a bcrypt hash or is undefined. Falling back to plaintext comparison.');
-          // Fallback for plaintext passwords (old users)
-          passwordMatch = (user.password === password);
-          // If plaintext password matches, rehash and update it
-          if (passwordMatch) {
-            console.log('handleLogin: Plaintext password match. Rehashing and updating stored password.');
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const updatedUsers = users.map(u => 
-              u.email === user.email ? { ...u, password: hashedPassword } : u
-            );
-            await AsyncStorage.setItem('users', JSON.stringify(updatedUsers));
-            user.password = hashedPassword; // Update current user object as well
-          }
-        }
+      logger.debug(CTX, `User found: ${user.name} (${user.email})`);
+
+      // Step 3: Check password
+      let passwordMatch = false;
+
+      if (user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$') || user.password.startsWith('$2y$'))) {
+        // Stored password is a bcrypt hash
+        logger.debug(CTX, 'Comparing against bcrypt hash...');
+        passwordMatch = bcrypt.compareSync(password, user.password);
+      } else {
+        // Legacy plaintext password - compare and upgrade
+        logger.warn(CTX, 'Plaintext password detected - comparing and upgrading...');
+        passwordMatch = (user.password === password);
 
         if (passwordMatch) {
-          await AsyncStorage.setItem('currentUser', JSON.stringify({
-            email: user.email,
-            name: user.name,
-          }));
-          await AsyncStorage.setItem('isLoggedIn', 'true');
-          await AsyncStorage.setItem('lastLoggedInUser', user.email); // Save email for biometric login
-          
-          Alert.alert('Erfolg', `Willkommen zurück, ${user.name}!`);
-          onLogin();
-        } else {
-          Alert.alert('Fehler', 'E-Mail oder Passwort ist falsch.');
+          // Upgrade to bcrypt
+          const hashedPassword = bcrypt.hashSync(password, 10);
+          const updatedUsers = users.map(u =>
+            u.email === user.email ? { ...u, password: hashedPassword } : u
+          );
+          await AsyncStorage.setItem('users', JSON.stringify(updatedUsers));
+          logger.info(CTX, 'Password upgraded to bcrypt');
         }
+      }
+
+      // Step 4: Handle result
+      if (passwordMatch) {
+        logger.info(CTX, `Login SUCCESS for ${user.name}`);
+
+        await AsyncStorage.setItem('currentUser', JSON.stringify({
+          email: user.email,
+          name: user.name,
+        }));
+        await AsyncStorage.setItem('isLoggedIn', 'true');
+        await AsyncStorage.setItem('lastLoggedInUser', user.email);
+
+        Alert.alert('Erfolg', `Willkommen zurueck, ${user.name}!`);
+        onLogin();
       } else {
+        logger.warn(CTX, 'Password mismatch');
         Alert.alert('Fehler', 'E-Mail oder Passwort ist falsch.');
       }
     } catch (error) {
-      Alert.alert('Fehler', 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
-      console.error(error);
+      logger.error(CTX, 'Login CRASHED', error.message);
+      Alert.alert(
+        'Login Fehler',
+        `Etwas ist schiefgelaufen:\n${error.message}\n\nCheck die Console fuer Details.`
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleBiometricLogin = async () => {
+    logger.info(CTX, 'Biometric login attempt');
     try {
       const savedEmail = await AsyncStorage.getItem('lastLoggedInUser');
       if (!savedEmail) {
-        return Alert.alert('Info', 'Bitte melden Sie sich zuerst manuell an, um die biometrische Anmeldung zu aktivieren.');
+        logger.warn(CTX, 'No saved email for biometric login');
+        return Alert.alert('Info', 'Bitte melde dich zuerst manuell an, um die biometrische Anmeldung zu aktivieren.');
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Melden Sie sich mit Ihrem Fingerabdruck an',
+        promptMessage: 'Melde dich mit deinem Fingerabdruck an',
       });
 
       if (result.success) {
@@ -125,17 +143,19 @@ export default function LoginScreen({ navigation, onLogin }) {
             name: user.name,
           }));
           await AsyncStorage.setItem('isLoggedIn', 'true');
-          Alert.alert('Erfolg', `Willkommen zurück, ${user.name}!`);
+          logger.info(CTX, `Biometric login SUCCESS for ${user.name}`);
+          Alert.alert('Erfolg', `Willkommen zurueck, ${user.name}!`);
           onLogin();
         } else {
-           Alert.alert('Fehler', 'Benutzer nicht gefunden. Bitte melden Sie sich manuell an.');
+          logger.error(CTX, `Biometric login: user not found for ${savedEmail}`);
+          Alert.alert('Fehler', 'Benutzer nicht gefunden. Bitte melde dich manuell an.');
         }
       } else {
-        // User cancelled or authentication failed
+        logger.debug(CTX, 'Biometric auth cancelled or failed');
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert('Fehler', 'Biometrische Anmeldung fehlgeschlagen.');
+      logger.error(CTX, 'Biometric login CRASHED', error.message);
+      Alert.alert('Fehler', `Biometrische Anmeldung fehlgeschlagen:\n${error.message}`);
     }
   };
 
@@ -149,9 +169,9 @@ export default function LoginScreen({ navigation, onLogin }) {
           <View style={styles.iconContainer}>
             <Ionicons name="wallet" size={80} color="#2196F3" />
           </View>
-          
+
           <Text style={styles.title}>FinanzApp</Text>
-          <Text style={styles.subtitle}>Melden Sie sich an</Text>
+          <Text style={styles.subtitle}>Melde dich an</Text>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>

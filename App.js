@@ -6,7 +6,9 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Re-add ThemeProvider import
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { runHealthCheck } from './utils/healthCheck';
+import logger from './utils/logger';
 import TransactionsScreen from './screens/TransactionsScreen';
 import StatistikScreen from './screens/StatistikScreen';
 import EinstellungenScreen from './screens/EinstellungenScreen';
@@ -118,45 +120,40 @@ export default function App() {
   }, [isLoggedIn]);
 
   const checkLoginStatus = async () => {
-    console.log('checkLoginStatus: checking...');
+    logger.info('App', 'Starting up...');
     try {
+      // Health check on startup - catches broken dependencies early
+      await runHealthCheck();
+
       const loggedIn = await AsyncStorage.getItem('isLoggedIn');
-      console.log('checkLoginStatus: isLoggedIn from AsyncStorage:', loggedIn);
+      logger.info('App', `Login status: ${loggedIn === 'true' ? 'logged in' : 'not logged in'}`);
       setIsLoggedIn(loggedIn === 'true');
     } catch (error) {
-      console.error('Fehler beim Prüfen des Login-Status:', error);
+      logger.error('App', 'Startup FAILED', error.message);
     } finally {
       setIsLoading(false);
-      console.log('checkLoginStatus: finished, isLoading:', false);
     }
   };
 
   const handleLogin = () => {
+    logger.info('App', 'User logged in');
     setIsLoggedIn(true);
-    console.log('handleLogin: setIsLoggedIn(true)');
   };
 
   const handleLogout = async () => {
-    console.log('handleLogout function called');
+    logger.info('App', 'Logging out...');
     try {
-      console.log('handleLogout: Attempting to remove isLoggedIn and currentUser from AsyncStorage');
       await AsyncStorage.removeItem('isLoggedIn');
       await AsyncStorage.removeItem('currentUser');
-      const loggedInAfterRemoval = await AsyncStorage.getItem('isLoggedIn');
-      const currentUserAfterRemoval = await AsyncStorage.getItem('currentUser');
-      console.log('handleLogout: isLoggedIn after removal:', loggedInAfterRemoval);
-      console.log('handleLogout: currentUser after removal:', currentUserAfterRemoval);
       setIsLoggedIn(false);
-      console.log('handleLogout: setIsLoggedIn(false)');
-      console.log('handleLogout: Logout successful');
+      logger.info('App', 'Logout successful');
     } catch (error) {
-      console.error('Fehler beim Logout:', error);
+      logger.error('App', 'Logout FAILED', error.message);
     }
   };
 
   if (isLoading) {
-    console.log('App: isLoading true, returning null');
-    return null; // Or a loading-screen
+    return null;
   }
 
   return (
