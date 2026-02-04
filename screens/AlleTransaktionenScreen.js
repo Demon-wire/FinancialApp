@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -54,6 +54,7 @@ export default function AlleTransaktionenScreen() {
   const [transaktionen, setTransaktionen] = useState([]);
   const [gefilterteTransaktionen, setGefilterteTransaktionen] = useState([]);
   const [aktivesKonto, setAktivesKonto] = useState('Alle');
+  const [suchbegriff, setSuchbegriff] = useState('');
   const openSwipeableRef = useRef(null);
 
   useFocusEffect(
@@ -68,13 +69,22 @@ export default function AlleTransaktionenScreen() {
   );
 
   useEffect(() => {
-    if (aktivesKonto === 'Alle') {
-      setGefilterteTransaktionen(transaktionen);
-    } else {
-      const gefiltert = transaktionen.filter(t => t.konto === aktivesKonto);
-      setGefilterteTransaktionen(gefiltert);
+    let gefiltert = transaktionen;
+
+    if (aktivesKonto !== 'Alle') {
+      gefiltert = gefiltert.filter(t => t.konto === aktivesKonto);
     }
-  }, [aktivesKonto, transaktionen]);
+
+    if (suchbegriff) {
+      const suchtext = suchbegriff.toLowerCase();
+      gefiltert = gefiltert.filter(t => 
+        t.kategorie.toLowerCase().includes(suchtext) ||
+        (t.notiz && t.notiz.toLowerCase().includes(suchtext))
+      );
+    }
+
+    setGefilterteTransaktionen(gefiltert);
+  }, [aktivesKonto, transaktionen, suchbegriff]);
 
   const ladeDaten = async () => {
     try {
@@ -185,6 +195,16 @@ export default function AlleTransaktionenScreen() {
             <Ionicons name="list-outline" size={32} color={currentTheme.primary} />
             <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Alle Transaktionen</Text>
         </View>
+        <View style={[styles.searchContainer, { backgroundColor: currentTheme.surface, borderColor: currentTheme.border }]}>
+          <Ionicons name="search-outline" size={20} color={currentTheme.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: currentTheme.text }]}
+            placeholder="Suche nach Kategorie oder Notiz..."
+            placeholderTextColor={currentTheme.textSecondary}
+            value={suchbegriff}
+            onChangeText={setSuchbegriff}
+          />
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kontenFilterContainer}>
           {KONTEN.map(konto => (
             <TouchableOpacity 
@@ -219,6 +239,9 @@ const styles = StyleSheet.create({
     headerCard: { paddingTop: 20, paddingBottom: 20, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
     headerTitle: { fontSize: 28, fontWeight: 'bold' },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, marginBottom: 20 },
+    searchIcon: { marginRight: 8 },
+    searchInput: { flex: 1, height: 48, fontSize: 16 },
     kontenFilterContainer: { gap: 12 },
     kontoButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, gap: 6 },
     kontoButtonText: { fontSize: 14, fontWeight: '600' },

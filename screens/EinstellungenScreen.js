@@ -193,6 +193,24 @@ export default function EinstellungenScreen({ onLogout }) {
                 await AsyncStorage.setItem('einnahmen', JSON.stringify(filteredEinnahmen));
               }
 
+              const ausgabenJson = await AsyncStorage.getItem('ausgaben');
+              if (ausgabenJson) {
+                const ausgaben = JSON.parse(ausgabenJson);
+                const filteredAusgaben = ausgaben.filter(
+                  (a) => a.userEmail !== userEmail
+                );
+                await AsyncStorage.setItem('ausgaben', JSON.stringify(filteredAusgaben));
+              }
+
+              const abosJson = await AsyncStorage.getItem('abos');
+              if (abosJson) {
+                const abos = JSON.parse(abosJson);
+                const filteredAbos = abos.filter(
+                  (abo) => abo.userEmail !== userEmail
+                );
+                await AsyncStorage.setItem('abos', JSON.stringify(filteredAbos));
+              }
+
               await AsyncStorage.removeItem('currentUser');
               await AsyncStorage.removeItem('isLoggedIn');
 

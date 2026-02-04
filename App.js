@@ -6,7 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Re-add ThemeProvider import
 import TransactionsScreen from './screens/TransactionsScreen';
 import StatistikScreen from './screens/StatistikScreen';
 import EinstellungenScreen from './screens/EinstellungenScreen';
@@ -17,6 +17,7 @@ import AlleTransaktionenScreen from './screens/AlleTransaktionenScreen';
 import AnleitungScreen from './screens/AnleitungScreen';
 import KontostandScreen from './screens/KontostandScreen';
 import EditTransactionScreen from './screens/EditTransactionScreen';
+import { verarbeiteAbos } from './services/aboService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -62,7 +63,10 @@ function MainTabs({ onLogout }) {
         },
         headerRight: () => (
           <TouchableOpacity
-            onPress={onLogout}
+            onPress={() => {
+              console.log('Logout button pressed');
+              onLogout();
+            }}
             style={{ marginRight: 16 }}
           >
             <Ionicons
@@ -91,7 +95,9 @@ const AppStack = ({ onLogout }) => {
   const { currentTheme } = useTheme();
   return (
     <Stack.Navigator>
-      <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="Main" options={{ headerShown: false }}>
+        {(props) => <MainTabs {...props} onLogout={onLogout} />}
+      </Stack.Screen>
       <Stack.Screen name="EditTransaction" component={EditTransactionScreen} options={{ title: 'Transaktion bearbeiten', headerStyle: { backgroundColor: currentTheme.headerBackground }, headerTintColor: currentTheme.headerText }}/>
     </Stack.Navigator>
   )
@@ -111,82 +117,45 @@ export default function App() {
     }
   }, [isLoggedIn]);
 
-  const verarbeiteAbos = async () => {
-    try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
-      if (!currentUserJson) return;
-      const currentUser = JSON.parse(currentUserJson);
-      const userEmail = currentUser.email;
-
-      const abosJson = await AsyncStorage.getItem('abos');
-      if (!abosJson) return;
-      let abos = JSON.parse(abosJson);
-
-      const ausgabenJson = await AsyncStorage.getItem('ausgaben');
-      let ausgaben = ausgabenJson ? JSON.parse(ausgabenJson) : [];
-
-      const heute = new Date();
-      let hatGeaendert = false;
-
-      const neueAbos = abos.map(abo => {
-        if (abo.userEmail !== userEmail) return abo;
-
-        const lastProcessed = new Date(abo.lastProcessed);
-        // Wenn letztes Mal in einem anderen Monat verarbeitet
-        if (lastProcessed.getMonth() !== heute.getMonth() || lastProcessed.getFullYear() !== heute.getFullYear()) {
-          // Neue Ausgabe erstellen
-          const neueAusgabe = {
-            id: Date.now().toString() + Math.random().toString(),
-            betrag: abo.betrag,
-            kategorie: 'Abo',
-            notiz: `Abonnement: ${abo.name}`,
-            konto: 'Girokonto',
-            datum: heute.toISOString(),
-            userEmail: userEmail,
-            typ: 'ausgabe',
-          };
-          ausgaben.push(neueAusgabe);
-          hatGeaendert = true;
-          return { ...abo, lastProcessed: heute.toISOString() };
-        }
-        return abo;
-      });
-
-      if (hatGeaendert) {
-        await AsyncStorage.setItem('ausgaben', JSON.stringify(ausgaben));
-        await AsyncStorage.setItem('abos', JSON.stringify(neueAbos));
-      }
-    } catch (error) {
-      console.error('Fehler bei der Abo-Verarbeitung:', error);
-    }
-  };
-
   const checkLoginStatus = async () => {
+    console.log('checkLoginStatus: checking...');
     try {
       const loggedIn = await AsyncStorage.getItem('isLoggedIn');
+      console.log('checkLoginStatus: isLoggedIn from AsyncStorage:', loggedIn);
       setIsLoggedIn(loggedIn === 'true');
     } catch (error) {
       console.error('Fehler beim Prüfen des Login-Status:', error);
     } finally {
       setIsLoading(false);
+      console.log('checkLoginStatus: finished, isLoading:', false);
     }
   };
 
   const handleLogin = () => {
     setIsLoggedIn(true);
+    console.log('handleLogin: setIsLoggedIn(true)');
   };
 
   const handleLogout = async () => {
+    console.log('handleLogout function called');
     try {
+      console.log('handleLogout: Attempting to remove isLoggedIn and currentUser from AsyncStorage');
       await AsyncStorage.removeItem('isLoggedIn');
       await AsyncStorage.removeItem('currentUser');
+      const loggedInAfterRemoval = await AsyncStorage.getItem('isLoggedIn');
+      const currentUserAfterRemoval = await AsyncStorage.getItem('currentUser');
+      console.log('handleLogout: isLoggedIn after removal:', loggedInAfterRemoval);
+      console.log('handleLogout: currentUser after removal:', currentUserAfterRemoval);
       setIsLoggedIn(false);
+      console.log('handleLogout: setIsLoggedIn(false)');
+      console.log('handleLogout: Logout successful');
     } catch (error) {
       console.error('Fehler beim Logout:', error);
     }
   };
 
   if (isLoading) {
+    console.log('App: isLoading true, returning null');
     return null; // Or a loading-screen
   }
 
