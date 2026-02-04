@@ -63,21 +63,24 @@ export default function LoginScreen({ navigation, onLogin }) {
         if (user.password && (user.password.startsWith('$2a$') || user.password.startsWith('$2b$') || user.password.startsWith('$2y$'))) {
           console.log('handleLogin: Stored password appears to be a bcrypt hash. Comparing...');
           passwordMatch = await bcrypt.compare(password, user.password);
-        } else {
-          console.log('handleLogin: Stored password is NOT a bcrypt hash or is undefined. Falling back to plaintext comparison.');
-          // Fallback for plaintext passwords (old users)
-          passwordMatch = (user.password === password);
-          // If plaintext password matches, rehash and update it
-          if (passwordMatch) {
-            console.log('handleLogin: Plaintext password match. Rehashing and updating stored password.');
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const updatedUsers = users.map(u => 
-              u.email === user.email ? { ...u, password: hashedPassword } : u
-            );
-            await AsyncStorage.setItem('users', JSON.stringify(updatedUsers));
-            user.password = hashedPassword; // Update current user object as well
-          }
-        }
+                  } else {
+                    console.log('handleLogin: Stored password is NOT a bcrypt hash or is undefined. Falling back to plaintext comparison.');
+                    // Fallback for plaintext passwords (old users)
+                    if (user.password) { // Added check for user.password
+                      passwordMatch = (user.password === password);
+                    } else {
+                      passwordMatch = false; // If no password stored, it can't match
+                    }
+                    // If plaintext password matches, rehash and update it
+                    if (passwordMatch) {
+                      console.log('handleLogin: Plaintext password match. Rehashing and updating stored password.');
+                      const hashedPassword = await bcrypt.hash(password, 10);
+                      const updatedUsers = users.map(u => 
+                        u.email === user.email ? { ...u, password: hashedPassword } : u
+                      );
+                      await AsyncStorage.setItem('users', JSON.stringify(updatedUsers));
+                      user.password = hashedPassword; // Update current user object as well
+                    }        }
 
         if (passwordMatch) {
           await AsyncStorage.setItem('currentUser', JSON.stringify({
