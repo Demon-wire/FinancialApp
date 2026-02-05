@@ -6,7 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Re-add ThemeProvider import
 import TransactionsScreen from './screens/TransactionsScreen';
 import StatistikScreen from './screens/StatistikScreen';
 import EinstellungenScreen from './screens/EinstellungenScreen';
@@ -14,11 +14,10 @@ import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import AbosScreen from './screens/AbosScreen';
 import AlleTransaktionenScreen from './screens/AlleTransaktionenScreen';
-import AnleitungScreen from './screens/AnleitungScreen'; // Import the new screen
+import AnleitungScreen from './screens/AnleitungScreen';
 import KontostandScreen from './screens/KontostandScreen';
-
-
-import { processSubscriptions } from './utils/SubscriptionProcessor';
+import EditTransactionScreen from './screens/EditTransactionScreen';
+import { verarbeiteAbos } from './services/aboService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -52,6 +51,31 @@ function MainTabs({ onLogout }) {
         },
         tabBarActiveTintColor: currentTheme.primary,
         tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          backgroundColor: currentTheme.surface,
+        },
+        headerStyle: {
+          backgroundColor: currentTheme.headerBackground,
+        },
+        headerTintColor: currentTheme.headerText,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => {
+              console.log('Logout button pressed');
+              onLogout();
+            }}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={24}
+              color={currentTheme.headerText}
+            />
+          </TouchableOpacity>
+        ),
       })}
     >
       <Tab.Screen name="Transaktionen" component={TransactionsScreen} />
@@ -65,6 +89,18 @@ function MainTabs({ onLogout }) {
       </Tab.Screen>
     </Tab.Navigator>
   );
+}
+
+const AppStack = ({ onLogout }) => {
+  const { currentTheme } = useTheme();
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Main" options={{ headerShown: false }}>
+        {(props) => <MainTabs {...props} onLogout={onLogout} />}
+      </Stack.Screen>
+      <Stack.Screen name="EditTransaction" component={EditTransactionScreen} options={{ title: 'Transaktion bearbeiten', headerStyle: { backgroundColor: currentTheme.headerBackground }, headerTintColor: currentTheme.headerText }}/>
+    </Stack.Navigator>
+  )
 }
 
 export default function App() {
@@ -85,62 +121,11 @@ export default function App() {
 =======
   }, [isLoggedIn]);
 
-  const verarbeiteAbos = async () => {
-    try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
-      if (!currentUserJson) return;
-      const currentUser = JSON.parse(currentUserJson);
-      const userEmail = currentUser.email;
-
-      const gespeicherteAbosJson = await AsyncStorage.getItem('abos');
-      const abos = gespeicherteAbosJson ? JSON.parse(gespeicherteAbosJson) : [];
-      const userAbos = abos.filter(abo => abo.userEmail === userEmail);
-
-      const gespeicherteAusgabenJson = await AsyncStorage.getItem('ausgaben');
-      let ausgaben = gespeicherteAusgabenJson ? JSON.parse(gespeicherteAusgabenJson) : [];
-
-      const heute = new Date();
-      let hasChanged = false;
-
-      for (const abo of userAbos) {
-        const lastProcessed = new Date(abo.lastProcessed);
-        if (
-          heute.getFullYear() > lastProcessed.getFullYear() ||
-          heute.getMonth() > lastProcessed.getMonth()
-        ) {
-          const neueAusgabe = {
-            id: Date.now().toString() + abo.id,
-            betrag: abo.betrag,
-            kategorie: 'Abo',
-            notiz: `Abo: ${abo.name}`,
-            konto: abo.konto || 'Girokonto', // Fallback
-            datum: heute.toISOString(),
-            userEmail: userEmail,
-          };
-          ausgaben.push(neueAusgabe);
-          abo.lastProcessed = heute.toISOString();
-          hasChanged = true;
-        }
-      }
-
-      if (hasChanged) {
-        const uniqueAusgaben = Array.from(new Set(ausgaben.map(a => a.id)))
-          .map(id => {
-            return ausgaben.find(a => a.id === id)
-          });
-
-        await AsyncStorage.setItem('abos', JSON.stringify(abos));
-        await AsyncStorage.setItem('ausgaben', JSON.stringify(uniqueAusgaben));
-      }
-    } catch (error) {
-      console.error("Fehler bei der Verarbeitung der Abos:", error);
-    }
-  };
->>>>>>> dev
-
   const checkLoginStatus = async () => {
+    console.log('checkLoginStatus: checking...');
     try {
       const loggedIn = await AsyncStorage.getItem('isLoggedIn');
+      console.log('checkLoginStatus: isLoggedIn from AsyncStorage:', loggedIn);
       setIsLoggedIn(loggedIn === 'true');
       const userJson = await AsyncStorage.getItem('currentUser');
       if (userJson) {
@@ -148,40 +133,45 @@ export default function App() {
       }
     } catch (error) {
       console.error('Fehler beim Prüfen des Login-Status:', error);
-      setIsLoggedIn(false);
     } finally {
       setIsLoading(false);
+      console.log('checkLoginStatus: finished, isLoading:', false);
     }
   };
 
-  const handleLogin = async () => {
-    const userJson = await AsyncStorage.getItem('currentUser');
-    if (userJson) {
-      setCurrentUserEmail(JSON.parse(userJson).email);
-    }
+  const handleLogin = () => {
     setIsLoggedIn(true);
+    console.log('handleLogin: setIsLoggedIn(true)');
   };
 
   const handleLogout = async () => {
+    console.log('handleLogout function called');
     try {
+      console.log('handleLogout: Attempting to remove isLoggedIn and currentUser from AsyncStorage');
       await AsyncStorage.removeItem('isLoggedIn');
       await AsyncStorage.removeItem('currentUser');
+      const loggedInAfterRemoval = await AsyncStorage.getItem('isLoggedIn');
+      const currentUserAfterRemoval = await AsyncStorage.getItem('currentUser');
+      console.log('handleLogout: isLoggedIn after removal:', loggedInAfterRemoval);
+      console.log('handleLogout: currentUser after removal:', currentUserAfterRemoval);
       setIsLoggedIn(false);
-      setCurrentUserEmail(null);
+      console.log('handleLogout: setIsLoggedIn(false)');
+      console.log('handleLogout: Logout successful');
     } catch (error) {
-      console.error('Fehler beim Abmelden:', error);
+      console.error('Fehler beim Logout:', error);
     }
   };
 
   if (isLoading) {
-    return null; // Oder ein Loading-Screen
+    console.log('App: isLoading true, returning null');
+    return null; // Or a loading-screen
   }
 
   return (
     <ThemeProvider>
       <NavigationContainer>
         {isLoggedIn ? (
-          <MainTabs onLogout={handleLogout} />
+          <AppStack onLogout={handleLogout} />
         ) : (
           <Stack.Navigator
             screenOptions={{

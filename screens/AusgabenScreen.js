@@ -64,6 +64,7 @@ export default function AusgabenScreen() {
         konto: konto,
         datum: new Date().toISOString(),
         userEmail: userEmail,
+        typ: 'ausgabe',
       };
 
       const gespeicherteAusgaben = await AsyncStorage.getItem('ausgaben');

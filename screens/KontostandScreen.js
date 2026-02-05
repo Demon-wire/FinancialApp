@@ -1,18 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function KontostandScreen() {
   const { currentTheme } = useTheme();
   const [kontostaende, setKontostaende] = useState({});
+  const [gesamtGuthaben, setGesamtGuthaben] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    ladeKontostaende();
-    const interval = setInterval(ladeKontostaende, 5000); // Aktualisiere alle 5 Sekunden
-    return () => clearInterval(interval);
+  useFocusEffect(
+    React.useCallback(() => {
+      ladeKontostaende();
+    }, [])
+  );
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    ladeKontostaende().then(() => setRefreshing(false));
   }, []);
 
   const ladeKontostaende = async () => {
@@ -21,6 +29,7 @@ export default function KontostandScreen() {
       const currentUserJson = await AsyncStorage.getItem('currentUser');
       if (!currentUserJson) {
         setKontostaende({});
+        setGesamtGuthaben(0);
         setIsLoading(false);
         return;
       }
@@ -33,22 +42,34 @@ export default function KontostandScreen() {
       const alleEinnahmen = einnahmenJson ? JSON.parse(einnahmenJson) : [];
       const alleAusgaben = ausgabenJson ? JSON.parse(ausgabenJson) : [];
 
-      const userEinnahmen = alleEinnahmen.filter(e => e.userEmail === userEmail);
-      const userAusgaben = alleAusgaben.filter(a => a.userEmail === userEmail);
+      const userEinnahmen = alleEinnahmen
+        .filter(e => e.userEmail === userEmail)
+        .map(e => ({ ...e, typ: 'einnahme' }));
+      
+      const userAusgaben = alleAusgaben
+        .filter(a => a.userEmail === userEmail)
+        .map(a => ({ ...a, typ: 'ausgabe' }));
 
       const kontobewegungen = [...userEinnahmen, ...userAusgaben];
 
+      let total = 0;
       const berechneteKontostaende = kontobewegungen.reduce((acc, transaktion) => {
         const konto = transaktion.konto || 'Unbekanntes Konto';
         if (!acc[konto]) {
           acc[konto] = 0;
         }
         if (transaktion.betrag) {
-          acc[konto] += (transaktion.typ === 'einnahme' ? 1 : -1) * parseFloat(transaktion.betrag);
+          const betrag = parseFloat(transaktion.betrag);
+          const faktor = transaktion.typ === 'einnahme' ? 1 : -1;
+          const wert = faktor * betrag;
+          acc[konto] += wert;
+          total += wert;
         }
         return acc;
       }, {});
+      
       setKontostaende(berechneteKontostaende);
+      setGesamtGuthaben(total);
     } catch (error) {
       console.error('Fehler beim Laden der Kontostände:', error);
     } finally {
@@ -72,13 +93,29 @@ export default function KontostandScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: currentTheme.background }]}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[currentTheme.primary]} />
+      }
+    >
+      {/* Gesamtguthaben Card */}
+      <View style={[styles.totalCard, { backgroundColor: currentTheme.primary }]}>
+        <Text style={styles.totalLabel}>Gesamtguthaben</Text>
+        <Text style={styles.totalValue}>{gesamtGuthaben.toFixed(2)} €</Text>
+        <Ionicons name="pie-chart-outline" size={80} color="rgba(255,255,255,0.2)" style={styles.bgIcon} />
+      </View>
+
       <View style={[styles.headerCard, { backgroundColor: currentTheme.cardBackground }]}>
         <View style={styles.headerTitleRow}>
-          <Ionicons name="wallet-outline" size={32} color={currentTheme.primary} />
-          <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Kontostände</Text>
+          <Ionicons name="wallet-outline" size={28} color={currentTheme.primary} />
+          <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Einzelne Konten</Text>
         </View>
-        {isLoading && <Text style={[styles.loadingText, { color: currentTheme.textSecondary }]}>Lädt Kontostände...</Text>}
+        
+        {isLoading && !refreshing && (
+          <Text style={[styles.loadingText, { color: currentTheme.textSecondary }]}>Lädt Kontostände...</Text>
+        )}
+        
         {!isLoading && Object.keys(kontostaende).length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="cash-outline" size={48} color={currentTheme.textSecondary} />
@@ -87,12 +124,15 @@ export default function KontostandScreen() {
             </Text>
           </View>
         )}
+        
         {!isLoading && Object.keys(kontostaende).length > 0 && (
           <View>
             {Object.entries(kontostaende).map(([kontoName, balance]) => (
               <View key={kontoName} style={[styles.kontoItem, { borderBottomColor: currentTheme.border }]}>
                 <View style={styles.kontoInfo}>
-                  <Ionicons name={getKontoIcon(kontoName)} size={24} color={currentTheme.text} />
+                  <View style={[styles.iconBox, { backgroundColor: currentTheme.surface }]}>
+                    <Ionicons name={getKontoIcon(kontoName)} size={22} color={currentTheme.primary} />
+                  </View>
                   <Text style={[styles.kontoName, { color: currentTheme.text }]}>{kontoName}</Text>
                 </View>
                 <Text style={[styles.kontoBalance, { color: balance >= 0 ? '#4CAF50' : '#F44336' }]}>
@@ -111,10 +151,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  totalCard: {
+    margin: 20,
+    padding: 24,
+    borderRadius: 20,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  totalLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  totalValue: {
+    color: '#fff',
+    fontSize: 36,
+    fontWeight: 'bold',
+  },
+  bgIcon: {
+    position: 'absolute',
+    right: -10,
+    bottom: -10,
+  },
   headerCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
     padding: 20,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -128,12 +197,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   loadingText: {
     textAlign: 'center',
-    marginTop: 20,
+    paddingVertical: 20,
   },
   emptyState: {
     alignItems: 'center',
@@ -148,20 +217,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: 16,
     borderBottomWidth: 1,
   },
   kontoInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   kontoName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
   },
   kontoBalance: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
   },
 });

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { useFocusEffect } from '@react-navigation/native'; // Keep this import
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Swipeable } from 'react-native-gesture-handler';
 
+// Kategorien und Konten Definitionen bleiben hier, da keine zentrale Datei mehr existiert
 const KONTEN = [
   { name: 'Alle', icon: 'apps-outline' },
   { name: 'Girokonto', icon: 'card-outline' },
@@ -14,60 +16,75 @@ const KONTEN = [
 ];
 
 const KATEGORIEN_EINNAHMEN = [
-  { name: 'Gehalt', icon: 'briefcase-outline', color: '#2196F3' },
-  { name: 'Nebentätigkeit', icon: 'cash-outline', color: '#4CAF50' },
-  { name: 'Investitionen', icon: 'trending-up-outline', color: '#FF9800' },
-  { name: 'Dividenden', icon: 'logo-bitcoin', color: '#607D8B' },
-  { name: 'Zinsen', icon: 'analytics-outline', color: '#795548' },
-  { name: 'Mieteinnahmen', icon: 'home-outline', color: '#FF5722' },
-  { name: 'Rückerstattung', icon: 'arrow-undo-outline', color: '#00BCD4' },
-  { name: 'Geschenk', icon: 'gift-outline', color: '#E91E63' },
-  { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
+    { name: 'Gehalt', icon: 'briefcase-outline', color: '#2196F3' },
+    { name: 'Nebentätigkeit', icon: 'cash-outline', color: '#4CAF50' },
+    { name: 'Investitionen', icon: 'trending-up-outline', color: '#FF9800' },
+    { name: 'Dividenden', icon: 'logo-bitcoin', color: '#607D8B' },
+    { name: 'Zinsen', icon: 'analytics-outline', color: '#795548' },
+    { name: 'Mieteinnahmen', icon: 'home-outline', color: '#FF5722' },
+    { name: 'Rückerstattung', icon: 'arrow-undo-outline', color: '#00BCD4' },
+    { name: 'Geschenk', icon: 'gift-outline', color: '#E91E63' },
+    { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
 ];
 
 const KATEGORIEN_AUSGABEN = [
-  { name: 'Miete', icon: 'home-outline', color: '#FF5722' },
-  { name: 'Lebensmittel', icon: 'cart-outline', color: '#FFC107' },
-  { name: 'Transport', icon: 'bus-outline', color: '#03A9F4' },
-  { name: 'Freizeit', icon: 'game-controller-outline', color: '#4CAF50' },
-  { name: 'Haushalt', icon: 'basket-outline', color: '#673AB7' },
-  { name: 'Gesundheit', icon: 'medkit-outline', color: '#E91E63' },
-  { name: 'Bildung', icon: 'school-outline', color: '#009688' },
-  { name: 'Kleidung', icon: 'shirt-outline', color: '#9C27B0' },
-  { name: 'Versicherung', icon: 'shield-checkmark-outline', color: '#3F51B5' },
-  { name: 'Abo', icon: 'repeat-outline', color: '#9E9E9E' }, // Added Abo with a default color
-  { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
+    { name: 'Miete', icon: 'home-outline', color: '#FF5722' },
+    { name: 'Lebensmittel', icon: 'cart-outline', color: '#FFC107' },
+    { name: 'Transport', icon: 'bus-outline', color: '#03A9F4' },
+    { name: 'Freizeit', icon: 'game-controller-outline', color: '#4CAF50' },
+    { name: 'Haushalt', icon: 'basket-outline', color: '#673AB7' },
+    { name: 'Gesundheit', icon: 'medkit-outline', color: '#E91E63' },
+    { name: 'Bildung', icon: 'school-outline', color: '#009688' },
+    { name: 'Kleidung', icon: 'shirt-outline', color: '#9C27B0' },
+    { name: 'Versicherung', icon: 'shield-checkmark-outline', color: '#3F51B5' },
+    { name: 'Abo', icon: 'repeat-outline', color: '#9E9E9E' },
+    { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
 ];
+
 
 function getCategoryDetails(categoryName, type) {
     let categories = type === 'einnahme' ? KATEGORIEN_EINNAHMEN : KATEGORIEN_AUSGABEN;
     const foundCategory = categories.find(cat => cat.name === categoryName);
-    const result = foundCategory || { name: categoryName, icon: 'ellipse-outline', color: '#9E9E9E' };
-    console.log(`getCategoryDetails for ${categoryName} (${type}):`, result); // Debug log
-    return result;
+    return foundCategory || { name: categoryName, icon: 'ellipse-outline', color: '#9E9E9E' };
 }
 
 export default function AlleTransaktionenScreen() {
   const { currentTheme } = useTheme();
+  const navigation = useNavigation();
   const [transaktionen, setTransaktionen] = useState([]);
   const [gefilterteTransaktionen, setGefilterteTransaktionen] = useState([]);
   const [aktivesKonto, setAktivesKonto] = useState('Alle');
+  const [suchbegriff, setSuchbegriff] = useState('');
+  const openSwipeableRef = useRef(null);
 
   useFocusEffect(
     React.useCallback(() => {
       ladeDaten();
+      return () => {
+        if (openSwipeableRef.current) {
+          openSwipeableRef.current.close();
+        }
+      };
     }, [])
   );
 
   useEffect(() => {
-    if (aktivesKonto === 'Alle') {
-      setGefilterteTransaktionen(transaktionen);
-    } else {
-      const gefiltert = transaktionen.filter(t => t.konto === aktivesKonto);
-      setGefilterteTransaktionen(gefiltert);
+    let gefiltert = transaktionen;
+
+    if (aktivesKonto !== 'Alle') {
+      gefiltert = gefiltert.filter(t => t.konto === aktivesKonto);
     }
-    console.log('--- Gefilterte Transaktionen (useEffect) ---', gefilterteTransaktionen); // Debug log
-  }, [aktivesKonto, transaktionen]);
+
+    if (suchbegriff) {
+      const suchtext = suchbegriff.toLowerCase();
+      gefiltert = gefiltert.filter(t => 
+        t.kategorie.toLowerCase().includes(suchtext) ||
+        (t.notiz && t.notiz.toLowerCase().includes(suchtext))
+      );
+    }
+
+    setGefilterteTransaktionen(gefiltert);
+  }, [aktivesKonto, transaktionen, suchbegriff]);
 
   const ladeDaten = async () => {
     try {
@@ -84,53 +101,81 @@ export default function AlleTransaktionenScreen() {
 
       const userEinnahmen = einnahmen
         .filter(e => e.userEmail === userEmail)
-        .map(e => ({ 
-            ...e, 
-            typ: 'einnahme', 
-            icon: getCategoryDetails(e.kategorie, 'einnahme').icon,
-            color: getCategoryDetails(e.kategorie, 'einnahme').color,
-            konto: e.konto || 'Unbekannt' // Fallback for old data
-        }));
+        .map(e => ({ ...e, typ: 'einnahme', icon: getCategoryDetails(e.kategorie, 'einnahme').icon, color: getCategoryDetails(e.kategorie, 'einnahme').color, konto: e.konto || 'Unbekannt' }));
 
       const userAusgaben = ausgaben
         .filter(a => a.userEmail === userEmail)
-        .map(a => ({ 
-            ...a, 
-            typ: 'ausgabe',
-            icon: getCategoryDetails(a.kategorie, 'ausgabe').icon,
-            color: getCategoryDetails(a.kategorie, 'ausgabe').color,
-            konto: a.konto || 'Unbekannt' // Fallback for old data
-        }));
+        .map(a => ({ ...a, typ: 'ausgabe', icon: getCategoryDetails(a.kategorie, 'ausgabe').icon, color: getCategoryDetails(a.kategorie, 'ausgabe').color, konto: a.konto || 'Unbekannt' }));
       
-      const alleTransaktionen = [...userEinnahmen, ...userAusgaben];
-      alleTransaktionen.sort((a, b) => new Date(b.datum) - new Date(a.datum));
+      const alleTransaktionen = [...userEinnahmen, ...userAusgaben].sort((a, b) => new Date(b.datum) - new Date(a.datum));
       
-      console.log('--- Geladene Transaktionen ---', alleTransaktionen); // Debug log
       setTransaktionen(alleTransaktionen);
     } catch (error) {
       console.error('Fehler beim Laden der Transaktionen:', error);
     }
   };
+
+  const handleDelete = (item) => {
+    Alert.alert(
+      "Transaktion löschen",
+      `Möchten Sie die ${item.typ} "${item.kategorie}" über ${item.betrag.toFixed(2)}€ wirklich löschen?`,
+      [
+        { text: "Abbrechen", style: "cancel", onPress: () => openSwipeableRef.current?.close() },
+        {
+          text: "Löschen",
+          onPress: async () => {
+            try {
+              const storageKey = item.typ === 'einnahme' ? 'einnahmen' : 'ausgaben';
+              const jsonValue = await AsyncStorage.getItem(storageKey);
+              let items = jsonValue ? JSON.parse(jsonValue) : [];
+              const filteredItems = items.filter(i => i.id !== item.id);
+              await AsyncStorage.setItem(storageKey, JSON.stringify(filteredItems));
+              ladeDaten();
+            } catch (e) {
+              Alert.alert("Fehler", "Transaktion konnte nicht gelöscht werden.");
+            }
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
   
-  const formatDatum = (datumString) => {
-    const datum = new Date(datumString);
-    return datum.toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+  const handleEdit = (item) => {
+    openSwipeableRef.current?.close();
+    navigation.navigate('EditTransaction', { 
+      transactionId: item.id,
+      transactionType: item.typ 
     });
   };
 
-  const renderItem = ({ item }) => {
-    console.log('--- Rendering Item ---', item); // Debug log
-    if (!item || !item.icon || !item.color || !item.kategorie || !item.konto) {
-      console.warn('Fehlende Daten in Transaktion:', item);
-      return null; // Don't render if essential data is missing
-    }
-    return (
-      <View style={[styles.transaktionItem, { borderBottomColor: currentTheme.border }]}>
-        <View style={[styles.iconContainer, { backgroundColor: item.typ === 'einnahme' ? `${item.color}20` : `${item.color}20` }]}>
-          <Ionicons name={item.icon} size={24} color={item.color} />
+  const formatDatum = (datumString) => {
+    const datum = new Date(datumString);
+    return datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const renderRightActions = (progress, dragX, item) => (
+    <View style={styles.actionsContainer}>
+      <TouchableOpacity onPress={() => handleEdit(item)} style={styles.editButton}>
+        <Ionicons name="pencil-outline" size={24} color="#fff" />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => handleDelete(item)} style={styles.deleteButton}>
+        <Ionicons name="trash-outline" size={24} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderItem = ({ item }) => (
+    <Swipeable
+      renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
+      overshootRight={false}
+      onSwipeableWillOpen={() => {
+        // This is a placeholder to potentially add logic back later if needed
+      }}
+    >
+      <View style={[styles.transaktionItem, { borderBottomColor: currentTheme.border, backgroundColor: currentTheme.cardBackground }]}>
+        <View style={[styles.iconContainer, { backgroundColor: `${getCategoryDetails(item.kategorie, item.typ).color}20` }]}>
+          <Ionicons name={getCategoryDetails(item.kategorie, item.typ).icon} size={24} color={getCategoryDetails(item.kategorie, item.typ).color} />
         </View>
         <View style={styles.transaktionInfo}>
           <Text style={[styles.transaktionKategorie, { color: currentTheme.text }]}>{item.kategorie}</Text>
@@ -140,8 +185,8 @@ export default function AlleTransaktionenScreen() {
           {item.typ === 'einnahme' ? '+' : '-'} {item.betrag.toFixed(2)} €
         </Text>
       </View>
-    );
-  };
+    </Swipeable>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
@@ -149,6 +194,16 @@ export default function AlleTransaktionenScreen() {
         <View style={styles.headerTitleRow}>
             <Ionicons name="list-outline" size={32} color={currentTheme.primary} />
             <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Alle Transaktionen</Text>
+        </View>
+        <View style={[styles.searchContainer, { backgroundColor: currentTheme.surface, borderColor: currentTheme.border }]}>
+          <Ionicons name="search-outline" size={20} color={currentTheme.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: currentTheme.text }]}
+            placeholder="Suche nach Kategorie oder Notiz..."
+            placeholderTextColor={currentTheme.textSecondary}
+            value={suchbegriff}
+            onChangeText={setSuchbegriff}
+          />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kontenFilterContainer}>
           {KONTEN.map(konto => (
@@ -167,13 +222,11 @@ export default function AlleTransaktionenScreen() {
         data={gefilterteTransaktionen}
         renderItem={renderItem}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={{ paddingBottom: 20 }}
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color={currentTheme.textSecondary} />
-            <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>
-              Keine Transaktionen gefunden.
-            </Text>
+            <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>Keine Transaktionen gefunden.</Text>
           </View>
         )}
       />
@@ -182,83 +235,25 @@ export default function AlleTransaktionenScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    headerCard: {
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    headerTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 20,
-    },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-    },
-    kontenFilterContainer: {
-        gap: 12,
-    },
-    kontoButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
-        borderWidth: 1,
-        gap: 6,
-    },
-    kontoButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    listContainer: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-    },
-    transaktionItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-    },
-    iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    transaktionInfo: {
-        flex: 1,
-    },
-    transaktionKategorie: {
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    transaktionDatum: {
-        fontSize: 12,
-    },
-    transaktionBetrag: {
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginTop: 50,
-    },
-    emptyText: {
-        marginTop: 16,
-        fontSize: 16,
-    },
+    container: { flex: 1 },
+    headerCard: { paddingTop: 20, paddingBottom: 20, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+    headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+    headerTitle: { fontSize: 28, fontWeight: 'bold' },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, marginBottom: 20 },
+    searchIcon: { marginRight: 8 },
+    searchInput: { flex: 1, height: 48, fontSize: 16 },
+    kontenFilterContainer: { gap: 12 },
+    kontoButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, gap: 6 },
+    kontoButtonText: { fontSize: 14, fontWeight: '600' },
+    transaktionItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1 },
+    iconContainer: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    transaktionInfo: { flex: 1 },
+    transaktionKategorie: { fontSize: 16, fontWeight: 'bold' },
+    transaktionDatum: { fontSize: 12 },
+    transaktionBetrag: { fontSize: 16, fontWeight: 'bold' },
+    emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+    emptyText: { marginTop: 16, fontSize: 16 },
+    actionsContainer: { flexDirection: 'row', width: 140 },
+    editButton: { flex: 1, backgroundColor: '#FF9800', justifyContent: 'center', alignItems: 'center' },
+    deleteButton: { flex: 1, backgroundColor: '#F44336', justifyContent: 'center', alignItems: 'center' },
 });

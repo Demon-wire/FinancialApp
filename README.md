@@ -1,3 +1,5 @@
+# WICHTIG NUR AUF DEV BRANCH SCHAUEN
+
 # FinanzApp
 
 Eine Cross-Platform Finanz-App für Android und iOS, die es ermöglicht, Einnahmen zu erfassen, zu kategorisieren und Statistiken anzuzeigen.

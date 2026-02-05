@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import bcrypt from 'bcrypt-react-native'; // Import bcrypt
 
 export default function RegisterScreen({ navigation, onRegister }) {
   const [name, setName] = useState('');
@@ -50,30 +51,29 @@ export default function RegisterScreen({ navigation, onRegister }) {
 
     setLoading(true);
     try {
-      // Lade gespeicherte Benutzer
       const usersJson = await AsyncStorage.getItem('users');
       const users = usersJson ? JSON.parse(usersJson) : [];
 
-      // Prüfe ob E-Mail bereits existiert
       if (users.find((u) => u.email === email.toLowerCase())) {
         Alert.alert('Fehler', 'Diese E-Mail-Adresse ist bereits registriert.');
         setLoading(false);
         return;
       }
 
-      // Erstelle neuen Benutzer
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10); // 10 salt rounds
+
       const newUser = {
         id: Date.now().toString(),
         name: name.trim(),
         email: email.toLowerCase().trim(),
-        password: password,
+        password: hashedPassword, // Store hashed password
         createdAt: new Date().toISOString(),
       };
 
       users.push(newUser);
       await AsyncStorage.setItem('users', JSON.stringify(users));
 
-      // Automatisch einloggen
       await AsyncStorage.setItem('currentUser', JSON.stringify({
         email: newUser.email,
         name: newUser.name,
