@@ -1,12 +1,15 @@
 import 'react-native-gesture-handler';
+import { enableScreens } from 'react-native-screens';
+enableScreens(false);
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, ScrollView, View, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemeProvider, useTheme } from './contexts/ThemeContext'; // Re-add ThemeProvider import
+import { getItem, setItem, removeItem } from './utils/storage';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import TransactionsScreen from './screens/TransactionsScreen';
 import StatistikScreen from './screens/StatistikScreen';
 import EinstellungenScreen from './screens/EinstellungenScreen';
@@ -17,43 +20,95 @@ import AlleTransaktionenScreen from './screens/AlleTransaktionenScreen';
 import AnleitungScreen from './screens/AnleitungScreen';
 import KontostandScreen from './screens/KontostandScreen';
 import EditTransactionScreen from './screens/EditTransactionScreen';
+import BudgetScreen from './screens/BudgetScreen';
 import { verarbeiteAbos } from './services/aboService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+const TAB_ICONS = {
+  'Transaktionen':      { focused: 'add-circle',   outline: 'add-circle-outline' },
+  'Alle Transaktionen': { focused: 'list',          outline: 'list-outline' },
+  'Kontostand':         { focused: 'wallet',         outline: 'wallet-outline' },
+  'Abos':               { focused: 'repeat',         outline: 'repeat-outline' },
+  'Budget':             { focused: 'pie-chart',      outline: 'pie-chart-outline' },
+  'Statistik':          { focused: 'stats-chart',    outline: 'stats-chart-outline' },
+  'Anleitung':          { focused: 'book',           outline: 'book-outline' },
+  'Einstellungen':      { focused: 'settings',       outline: 'settings-outline' },
+};
+
+function ScrollableTabBar({ state, descriptors, navigation }) {
+  const { currentTheme } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={{
+      backgroundColor: currentTheme.surface,
+      borderTopWidth: 1,
+      borderTopColor: currentTheme.border || '#e0e0e0',
+      paddingBottom: insets.bottom,
+    }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ flexDirection: 'row' }}
+      >
+        {state.routes.map((route, index) => {
+          const isFocused = state.index === index;
+          const icons = TAB_ICONS[route.name];
+          const color = isFocused ? currentTheme.primary : 'gray';
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={onPress}
+              style={{
+                width: 90,
+                alignItems: 'center',
+                paddingVertical: 10,
+                borderTopWidth: 2,
+                borderTopColor: isFocused ? currentTheme.primary : 'transparent',
+              }}
+            >
+              <Ionicons
+                name={isFocused ? icons.focused : icons.outline}
+                size={24}
+                color={color}
+              />
+              <Text style={{
+                color,
+                fontSize: 10,
+                marginTop: 3,
+                textAlign: 'center',
+              }}>
+                {route.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 function MainTabs({ onLogout }) {
   const { currentTheme } = useTheme();
-  
+
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
-          if (route.name === 'Transaktionen') {
-            iconName = focused ? 'add-circle' : 'add-circle-outline';
-          } else if (route.name === 'Alle Transaktionen') {
-            iconName = focused ? 'list' : 'list-outline';
-          } else if (route.name === 'Anleitung') {
-            iconName = focused ? 'book' : 'book-outline';
-          } else if (route.name === 'Statistik') {
-            iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-          } else if (route.name === 'Abos') {
-            iconName = focused ? 'repeat' : 'repeat-outline';
-          } else if (route.name === 'Kontostand') {
-            iconName = focused ? 'wallet' : 'wallet-outline';
-          } else if (route.name === 'Einstellungen') {
-            iconName = focused ? 'settings' : 'settings-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: currentTheme.primary,
-        tabBarInactiveTintColor: 'gray',
-        tabBarStyle: {
-          backgroundColor: currentTheme.surface,
-        },
+      tabBar={(props) => <ScrollableTabBar {...props} />}
+      screenOptions={{
         headerStyle: {
           backgroundColor: currentTheme.headerBackground,
         },
@@ -63,10 +118,7 @@ function MainTabs({ onLogout }) {
         },
         headerRight: () => (
           <TouchableOpacity
-            onPress={() => {
-              console.log('Logout button pressed');
-              onLogout();
-            }}
+            onPress={onLogout}
             style={{ marginRight: 16 }}
           >
             <Ionicons
@@ -76,12 +128,13 @@ function MainTabs({ onLogout }) {
             />
           </TouchableOpacity>
         ),
-      })}
+      }}
     >
       <Tab.Screen name="Transaktionen" component={TransactionsScreen} />
       <Tab.Screen name="Alle Transaktionen" component={AlleTransaktionenScreen} />
       <Tab.Screen name="Kontostand" component={KontostandScreen} />
       <Tab.Screen name="Abos" component={AbosScreen} />
+      <Tab.Screen name="Budget" component={BudgetScreen} />
       <Tab.Screen name="Statistik" component={StatistikScreen} />
       <Tab.Screen name="Anleitung" component={AnleitungScreen} />
       <Tab.Screen name="Einstellungen">
@@ -98,73 +151,60 @@ const AppStack = ({ onLogout }) => {
       <Stack.Screen name="Main" options={{ headerShown: false }}>
         {(props) => <MainTabs {...props} onLogout={onLogout} />}
       </Stack.Screen>
-      <Stack.Screen name="EditTransaction" component={EditTransactionScreen} options={{ title: 'Transaktion bearbeiten', headerStyle: { backgroundColor: currentTheme.headerBackground }, headerTintColor: currentTheme.headerText }}/>
+      <Stack.Screen
+        name="EditTransaction"
+        component={EditTransactionScreen}
+        options={{
+          title: 'Transaktion bearbeiten',
+          headerStyle: { backgroundColor: currentTheme.headerBackground },
+          headerTintColor: currentTheme.headerText,
+        }}
+      />
     </Stack.Navigator>
-  )
-}
+  );
+};
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUserEmail, setCurrentUserEmail] = useState(null);
 
   useEffect(() => {
     checkLoginStatus();
   }, []);
 
   useEffect(() => {
-    if (isLoggedIn && currentUserEmail) {
-      processSubscriptions(currentUserEmail);
+    if (isLoggedIn) {
+      verarbeiteAbos();
     }
-<<<<<<< HEAD
-  }, [isLoggedIn, currentUserEmail]);
-=======
   }, [isLoggedIn]);
 
   const checkLoginStatus = async () => {
-    console.log('checkLoginStatus: checking...');
     try {
-      const loggedIn = await AsyncStorage.getItem('isLoggedIn');
-      console.log('checkLoginStatus: isLoggedIn from AsyncStorage:', loggedIn);
+      const loggedIn = await getItem('isLoggedIn');
       setIsLoggedIn(loggedIn === 'true');
-      const userJson = await AsyncStorage.getItem('currentUser');
-      if (userJson) {
-        setCurrentUserEmail(JSON.parse(userJson).email);
-      }
     } catch (error) {
       console.error('Fehler beim Prüfen des Login-Status:', error);
     } finally {
       setIsLoading(false);
-      console.log('checkLoginStatus: finished, isLoading:', false);
     }
   };
 
   const handleLogin = () => {
     setIsLoggedIn(true);
-    console.log('handleLogin: setIsLoggedIn(true)');
   };
 
   const handleLogout = async () => {
-    console.log('handleLogout function called');
     try {
-      console.log('handleLogout: Attempting to remove isLoggedIn and currentUser from AsyncStorage');
-      await AsyncStorage.removeItem('isLoggedIn');
-      await AsyncStorage.removeItem('currentUser');
-      const loggedInAfterRemoval = await AsyncStorage.getItem('isLoggedIn');
-      const currentUserAfterRemoval = await AsyncStorage.getItem('currentUser');
-      console.log('handleLogout: isLoggedIn after removal:', loggedInAfterRemoval);
-      console.log('handleLogout: currentUser after removal:', currentUserAfterRemoval);
+      await removeItem('isLoggedIn');
+      await removeItem('currentUser');
       setIsLoggedIn(false);
-      console.log('handleLogout: setIsLoggedIn(false)');
-      console.log('handleLogout: Logout successful');
     } catch (error) {
       console.error('Fehler beim Logout:', error);
     }
   };
 
   if (isLoading) {
-    console.log('App: isLoading true, returning null');
-    return null; // Or a loading-screen
+    return null;
   }
 
   return (
@@ -173,11 +213,7 @@ export default function App() {
         {isLoggedIn ? (
           <AppStack onLogout={handleLogout} />
         ) : (
-          <Stack.Navigator
-            screenOptions={{
-              // headerShown: false, // Temporarily removed for debugging
-            }}
-          >
+          <Stack.Navigator>
             <Stack.Screen name="Login">
               {(props) => <LoginScreen {...props} onLogin={handleLogin} />}
             </Stack.Screen>

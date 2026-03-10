@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem } from '../utils/storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -32,7 +32,7 @@ export default function EditTransactionScreen({ route, navigation }) {
   useEffect(() => {
     const ladeTransaktion = async () => {
       const storageKey = transactionType === 'einnahme' ? 'einnahmen' : 'ausgaben';
-      const itemsJson = await AsyncStorage.getItem(storageKey);
+      const itemsJson = await getItem(storageKey);
       const items = itemsJson ? JSON.parse(itemsJson) : [];
       const tx = items.find(t => t.id === transactionId);
 
@@ -57,7 +57,7 @@ export default function EditTransactionScreen({ route, navigation }) {
     }
 
     const storageKey = transactionType === 'einnahme' ? 'einnahmen' : 'ausgaben';
-    const itemsJson = await AsyncStorage.getItem(storageKey);
+    const itemsJson = await getItem(storageKey);
     let items = itemsJson ? JSON.parse(itemsJson) : [];
 
     const updatedItems = items.map(item => {
@@ -67,7 +67,7 @@ export default function EditTransactionScreen({ route, navigation }) {
       return item;
     });
 
-    await AsyncStorage.setItem(storageKey, JSON.stringify(updatedItems));
+    await setItem(storageKey, JSON.stringify(updatedItems));
     Alert.alert('✅ Erfolg', 'Transaktion wurde erfolgreich aktualisiert!');
     navigation.goBack();
   };

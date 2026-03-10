@@ -10,9 +10,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem, removeItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, THEMES } from '../contexts/ThemeContext';
+import * as Crypto from 'expo-crypto';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 export default function EinstellungenScreen({ onLogout }) {
   const { currentTheme, theme, changeTheme, availableThemes } = useTheme();
@@ -32,7 +35,7 @@ export default function EinstellungenScreen({ onLogout }) {
 
   const loadUserData = async () => {
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (currentUserJson) {
         const currentUser = JSON.parse(currentUserJson);
         setEmail(currentUser.email);
@@ -51,7 +54,7 @@ export default function EinstellungenScreen({ onLogout }) {
 
     setLoading(true);
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
         Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
         return;
@@ -60,7 +63,7 @@ export default function EinstellungenScreen({ onLogout }) {
       const currentUser = JSON.parse(currentUserJson);
       const oldEmail = currentUser.email;
 
-      const usersJson = await AsyncStorage.getItem('users');
+      const usersJson = await getItem('users');
       const users = usersJson ? JSON.parse(usersJson) : [];
 
       if (email.toLowerCase() !== oldEmail.toLowerCase()) {
@@ -77,13 +80,13 @@ export default function EinstellungenScreen({ onLogout }) {
       const userIndex = users.findIndex((u) => u.email === oldEmail);
       if (userIndex !== -1) {
         users[userIndex].email = email.toLowerCase();
-        await AsyncStorage.setItem('users', JSON.stringify(users));
+        await setItem('users', JSON.stringify(users));
       }
 
       currentUser.email = email.toLowerCase();
-      await AsyncStorage.setItem('currentUser', JSON.stringify(currentUser));
+      await setItem('currentUser', JSON.stringify(currentUser));
 
-      const einnahmenJson = await AsyncStorage.getItem('einnahmen');
+      const einnahmenJson = await getItem('einnahmen');
       if (einnahmenJson) {
         const einnahmen = JSON.parse(einnahmenJson);
         einnahmen.forEach((einnahme) => {
@@ -91,8 +94,32 @@ export default function EinstellungenScreen({ onLogout }) {
             einnahme.userEmail = email.toLowerCase();
           }
         });
-        await AsyncStorage.setItem('einnahmen', JSON.stringify(einnahmen));
+        await setItem('einnahmen', JSON.stringify(einnahmen));
       }
+
+      const ausgabenJson = await getItem('ausgaben');
+      if (ausgabenJson) {
+        const ausgaben = JSON.parse(ausgabenJson);
+        ausgaben.forEach((ausgabe) => {
+          if (ausgabe.userEmail === oldEmail) {
+            ausgabe.userEmail = email.toLowerCase();
+          }
+        });
+        await setItem('ausgaben', JSON.stringify(ausgaben));
+      }
+
+      const abosJson = await getItem('abos');
+      if (abosJson) {
+        const abos = JSON.parse(abosJson);
+        abos.forEach((abo) => {
+          if (abo.userEmail === oldEmail) {
+            abo.userEmail = email.toLowerCase();
+          }
+        });
+        await setItem('abos', JSON.stringify(abos));
+      }
+
+      await setItem('lastLoggedInUser', email.toLowerCase());
 
       Alert.alert('✅ Erfolg', 'E-Mail-Adresse wurde erfolgreich geändert.');
     } catch (error) {
@@ -121,7 +148,7 @@ export default function EinstellungenScreen({ onLogout }) {
 
     setLoading(true);
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
         Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
         return;
@@ -129,18 +156,41 @@ export default function EinstellungenScreen({ onLogout }) {
 
       const currentUser = JSON.parse(currentUserJson);
 
-      const usersJson = await AsyncStorage.getItem('users');
+      const usersJson = await getItem('users');
       const users = usersJson ? JSON.parse(usersJson) : [];
 
       const user = users.find((u) => u.email === currentUser.email);
-      if (!user || user.password !== currentPassword) {
+      if (!user) {
+        Alert.alert('Fehler', 'Benutzer nicht gefunden.');
+        setLoading(false);
+        return;
+      }
+
+      let passwordMatch = false;
+      if (user.password && user.password.startsWith('sha256:')) {
+        const [, salt, storedHash] = user.password.split(':');
+        const computed = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          currentPassword + salt
+        );
+        passwordMatch = computed === storedHash;
+      } else {
+        passwordMatch = user.password === currentPassword;
+      }
+
+      if (!passwordMatch) {
         Alert.alert('Fehler', 'Das aktuelle Passwort ist falsch.');
         setLoading(false);
         return;
       }
 
-      user.password = newPassword;
-      await AsyncStorage.setItem('users', JSON.stringify(users));
+      const salt = Crypto.randomUUID();
+      const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        newPassword + salt
+      );
+      user.password = `sha256:${salt}:${hash}`;
+      await setItem('users', JSON.stringify(users));
 
       Alert.alert('✅ Erfolg', 'Passwort wurde erfolgreich geändert.');
       setCurrentPassword('');
@@ -151,6 +201,50 @@ export default function EinstellungenScreen({ onLogout }) {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const currentUserJson = await getItem('currentUser');
+      if (!currentUserJson) {
+        Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
+        return;
+      }
+      const currentUser = JSON.parse(currentUserJson);
+      const userEmail = currentUser.email;
+
+      const einnahmenJson = await getItem('einnahmen');
+      const ausgabenJson = await getItem('ausgaben');
+
+      const einnahmen = einnahmenJson ? JSON.parse(einnahmenJson).filter(e => e.userEmail === userEmail) : [];
+      const ausgaben = ausgabenJson ? JSON.parse(ausgabenJson).filter(a => a.userEmail === userEmail) : [];
+
+      const header = 'Datum,Typ,Kategorie,Betrag,Konto,Notiz\n';
+      const formatRow = (t, typ) => {
+        const datum = new Date(t.datum).toLocaleDateString('de-DE');
+        const notiz = (t.notiz || '').replace(/,/g, ';').replace(/\n/g, ' ');
+        return `${datum},${typ},${t.kategorie},${t.betrag.toFixed(2)},${t.konto || ''},${notiz}`;
+      };
+
+      const rows = [
+        ...einnahmen.map(e => formatRow(e, 'Einnahme')),
+        ...ausgaben.map(a => formatRow(a, 'Ausgabe')),
+      ];
+
+      const csvContent = header + rows.join('\n');
+      const fileUri = FileSystem.documentDirectory + 'transaktionen.csv';
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Transaktionen exportieren' });
+      } else {
+        Alert.alert('Info', `Datei gespeichert unter: ${fileUri}`);
+      }
+    } catch (error) {
+      Alert.alert('Fehler', 'Export konnte nicht durchgeführt werden.');
+      console.error(error);
     }
   };
 
@@ -168,7 +262,7 @@ export default function EinstellungenScreen({ onLogout }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              const currentUserJson = await AsyncStorage.getItem('currentUser');
+              const currentUserJson = await getItem('currentUser');
               if (!currentUserJson) {
                 Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
                 return;
@@ -177,42 +271,36 @@ export default function EinstellungenScreen({ onLogout }) {
               const currentUser = JSON.parse(currentUserJson);
               const userEmail = currentUser.email;
 
-              const usersJson = await AsyncStorage.getItem('users');
+              const usersJson = await getItem('users');
               if (usersJson) {
                 const users = JSON.parse(usersJson);
                 const filteredUsers = users.filter((u) => u.email !== userEmail);
-                await AsyncStorage.setItem('users', JSON.stringify(filteredUsers));
+                await setItem('users', JSON.stringify(filteredUsers));
               }
 
-              const einnahmenJson = await AsyncStorage.getItem('einnahmen');
+              const einnahmenJson = await getItem('einnahmen');
               if (einnahmenJson) {
                 const einnahmen = JSON.parse(einnahmenJson);
-                const filteredEinnahmen = einnahmen.filter(
-                  (e) => e.userEmail !== userEmail
-                );
-                await AsyncStorage.setItem('einnahmen', JSON.stringify(filteredEinnahmen));
+                const filteredEinnahmen = einnahmen.filter((e) => e.userEmail !== userEmail);
+                await setItem('einnahmen', JSON.stringify(filteredEinnahmen));
               }
 
-              const ausgabenJson = await AsyncStorage.getItem('ausgaben');
+              const ausgabenJson = await getItem('ausgaben');
               if (ausgabenJson) {
                 const ausgaben = JSON.parse(ausgabenJson);
-                const filteredAusgaben = ausgaben.filter(
-                  (a) => a.userEmail !== userEmail
-                );
-                await AsyncStorage.setItem('ausgaben', JSON.stringify(filteredAusgaben));
+                const filteredAusgaben = ausgaben.filter((a) => a.userEmail !== userEmail);
+                await setItem('ausgaben', JSON.stringify(filteredAusgaben));
               }
 
-              const abosJson = await AsyncStorage.getItem('abos');
+              const abosJson = await getItem('abos');
               if (abosJson) {
                 const abos = JSON.parse(abosJson);
-                const filteredAbos = abos.filter(
-                  (abo) => abo.userEmail !== userEmail
-                );
-                await AsyncStorage.setItem('abos', JSON.stringify(filteredAbos));
+                const filteredAbos = abos.filter((abo) => abo.userEmail !== userEmail);
+                await setItem('abos', JSON.stringify(filteredAbos));
               }
 
-              await AsyncStorage.removeItem('currentUser');
-              await AsyncStorage.removeItem('isLoggedIn');
+              await removeItem('currentUser');
+              await removeItem('isLoggedIn');
 
               Alert.alert('Erfolg', 'Ihr Konto wurde erfolgreich gelöscht.');
               onLogout();
@@ -231,7 +319,7 @@ export default function EinstellungenScreen({ onLogout }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[styles.container, { backgroundColor: currentTheme.background }]}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -293,15 +381,8 @@ export default function EinstellungenScreen({ onLogout }) {
               value={currentPassword}
               onChangeText={setCurrentPassword}
             />
-            <TouchableOpacity
-              onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showCurrentPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={20}
-                color={currentTheme.textSecondary}
-              />
+            <TouchableOpacity onPress={() => setShowCurrentPassword(!showCurrentPassword)} style={styles.eyeIcon}>
+              <Ionicons name={showCurrentPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={currentTheme.textSecondary} />
             </TouchableOpacity>
           </View>
           <View style={[styles.inputContainer, { borderColor: currentTheme.border }]}>
@@ -314,15 +395,8 @@ export default function EinstellungenScreen({ onLogout }) {
               value={newPassword}
               onChangeText={setNewPassword}
             />
-            <TouchableOpacity
-              onPress={() => setShowNewPassword(!showNewPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showNewPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={20}
-                color={currentTheme.textSecondary}
-              />
+            <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.eyeIcon}>
+              <Ionicons name={showNewPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={currentTheme.textSecondary} />
             </TouchableOpacity>
           </View>
           <View style={[styles.inputContainer, { borderColor: currentTheme.border }]}>
@@ -335,15 +409,8 @@ export default function EinstellungenScreen({ onLogout }) {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
             />
-            <TouchableOpacity
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={20}
-                color={currentTheme.textSecondary}
-              />
+            <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+              <Ionicons name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color={currentTheme.textSecondary} />
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -383,24 +450,9 @@ export default function EinstellungenScreen({ onLogout }) {
                   onPress={() => changeTheme(themeKey)}
                   activeOpacity={0.8}
                 >
-                  <View
-                    style={[
-                      styles.themePreview,
-                      { backgroundColor: themeData.background },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.themePreviewCard,
-                        { backgroundColor: themeData.surface },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.themePreviewAccent,
-                        { backgroundColor: themeData.primary },
-                      ]}
-                    />
+                  <View style={[styles.themePreview, { backgroundColor: themeData.background }]}>
+                    <View style={[styles.themePreviewCard, { backgroundColor: themeData.surface }]} />
+                    <View style={[styles.themePreviewAccent, { backgroundColor: themeData.primary }]} />
                   </View>
                   <Text style={[styles.themeName, { color: currentTheme.text }]}>
                     {themeData.name}
@@ -414,6 +466,24 @@ export default function EinstellungenScreen({ onLogout }) {
               );
             })}
           </View>
+        </View>
+
+        {/* Daten exportieren */}
+        <View style={[styles.section, { backgroundColor: currentTheme.cardBackground }]}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="download-outline" size={24} color={currentTheme.primary} />
+            <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>
+              Daten exportieren
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: currentTheme.primary }]}
+            onPress={handleExportCSV}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="document-text-outline" size={20} color="#fff" />
+            <Text style={styles.buttonText}>Transaktionen als CSV exportieren</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Konto löschen */}

@@ -1,27 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useFocusEffect } from '@react-navigation/native';
+
+const INTERVALLE = ['monatlich', 'wöchentlich', 'jährlich'];
 
 export default function AbosScreen() {
   const { currentTheme } = useTheme();
   const [abos, setAbos] = useState([]);
   const [name, setName] = useState('');
   const [betrag, setBetrag] = useState('');
+  const [intervall, setIntervall] = useState('monatlich');
 
-  useEffect(() => {
-    ladeAbos();
-  }, []);
+  useFocusEffect(React.useCallback(() => { ladeAbos(); }, []));
 
   const ladeAbos = async () => {
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) return;
       const currentUser = JSON.parse(currentUserJson);
       const userEmail = currentUser.email;
 
-      const gespeicherteAbos = await AsyncStorage.getItem('abos');
+      const gespeicherteAbos = await getItem('abos');
       if (gespeicherteAbos) {
         const alleAbos = JSON.parse(gespeicherteAbos);
         const userAbos = alleAbos.filter(abo => abo.userEmail === userEmail);
@@ -39,7 +41,7 @@ export default function AbosScreen() {
     }
 
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
         Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
         return;
@@ -52,17 +54,19 @@ export default function AbosScreen() {
         name,
         betrag: parseFloat(betrag),
         userEmail,
-        lastProcessed: new Date().toISOString(), // Initial auf heute setzen
+        intervall,
+        lastProcessed: new Date().toISOString(),
       };
 
-      const gespeicherteAbos = await AsyncStorage.getItem('abos');
+      const gespeicherteAbos = await getItem('abos');
       const alleAbos = gespeicherteAbos ? JSON.parse(gespeicherteAbos) : [];
       alleAbos.push(neuesAbo);
-      await AsyncStorage.setItem('abos', JSON.stringify(alleAbos));
+      await setItem('abos', JSON.stringify(alleAbos));
 
       Alert.alert('✅ Erfolg', 'Abonnement wurde erfolgreich gespeichert!');
       setName('');
       setBetrag('');
+      setIntervall('monatlich');
       ladeAbos();
     } catch (error) {
       Alert.alert('Fehler', 'Abonnement konnte nicht gespeichert werden.');
@@ -72,11 +76,11 @@ export default function AbosScreen() {
 
   const loescheAbo = async (id) => {
     try {
-      const gespeicherteAbos = await AsyncStorage.getItem('abos');
+      const gespeicherteAbos = await getItem('abos');
       if (gespeicherteAbos) {
         let alleAbos = JSON.parse(gespeicherteAbos);
         alleAbos = alleAbos.filter(abo => abo.id !== id);
-        await AsyncStorage.setItem('abos', JSON.stringify(alleAbos));
+        await setItem('abos', JSON.stringify(alleAbos));
         ladeAbos();
       }
     } catch (error) {
@@ -85,13 +89,19 @@ export default function AbosScreen() {
     }
   };
 
+  const intervallLabel = (i) => {
+    if (i === 'wöchentlich') return '/ Woche';
+    if (i === 'jährlich') return '/ Jahr';
+    return '/ Monat';
+  };
+
   const renderItem = ({ item }) => (
     <View style={[styles.aboItem, { backgroundColor: currentTheme.cardBackground, borderBottomColor: currentTheme.border }]}>
       <Ionicons name="repeat-outline" size={24} color={currentTheme.primary} />
       <View style={styles.aboInfo}>
         <Text style={[styles.aboName, { color: currentTheme.text }]}>{item.name}</Text>
         <Text style={[styles.aboBetrag, { color: currentTheme.textSecondary }]}>
-          {item.betrag.toFixed(2)} € / Monat
+          {item.betrag.toFixed(2)} € {intervallLabel(item.intervall || 'monatlich')}
         </Text>
       </View>
       <TouchableOpacity onPress={() => loescheAbo(item.id)}>
@@ -113,12 +123,32 @@ export default function AbosScreen() {
         />
         <TextInput
           style={[styles.input, { color: currentTheme.text, borderColor: currentTheme.border }]}
-          placeholder="Monatlicher Betrag"
+          placeholder="Betrag"
           placeholderTextColor={currentTheme.textSecondary}
           keyboardType="decimal-pad"
           value={betrag}
           onChangeText={setBetrag}
         />
+        <Text style={[styles.intervallLabel, { color: currentTheme.text }]}>Intervall</Text>
+        <View style={styles.intervallContainer}>
+          {INTERVALLE.map((iv) => (
+            <TouchableOpacity
+              key={iv}
+              style={[
+                styles.intervallButton,
+                {
+                  backgroundColor: intervall === iv ? currentTheme.primary : currentTheme.surface,
+                  borderColor: intervall === iv ? currentTheme.primary : currentTheme.border,
+                },
+              ]}
+              onPress={() => setIntervall(iv)}
+            >
+              <Text style={[styles.intervallButtonText, { color: intervall === iv ? '#fff' : currentTheme.text }]}>
+                {iv.charAt(0).toUpperCase() + iv.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <TouchableOpacity style={[styles.speichernButton, { backgroundColor: currentTheme.primary }]} onPress={speichereAbo}>
           <Text style={styles.speichernButtonText}>Abo speichern</Text>
         </TouchableOpacity>
@@ -161,6 +191,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     marginBottom: 12,
+  },
+  intervallLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  intervallContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  intervallButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  intervallButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   speichernButton: {
     padding: 16,

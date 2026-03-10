@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,7 +26,7 @@ export default function KontostandScreen() {
   const ladeKontostaende = async () => {
     setIsLoading(true);
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
         setKontostaende({});
         setGesamtGuthaben(0);
@@ -36,8 +36,8 @@ export default function KontostandScreen() {
       const currentUser = JSON.parse(currentUserJson);
       const userEmail = currentUser.email;
 
-      const einnahmenJson = await AsyncStorage.getItem('einnahmen');
-      const ausgabenJson = await AsyncStorage.getItem('ausgaben');
+      const einnahmenJson = await getItem('einnahmen');
+      const ausgabenJson = await getItem('ausgaben');
 
       const alleEinnahmen = einnahmenJson ? JSON.parse(einnahmenJson) : [];
       const alleAusgaben = ausgabenJson ? JSON.parse(ausgabenJson) : [];

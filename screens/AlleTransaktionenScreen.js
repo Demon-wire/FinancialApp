@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -88,13 +88,13 @@ export default function AlleTransaktionenScreen() {
 
   const ladeDaten = async () => {
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) return;
       const currentUser = JSON.parse(currentUserJson);
       const userEmail = currentUser.email;
 
-      const einnahmenJson = await AsyncStorage.getItem('einnahmen');
-      const ausgabenJson = await AsyncStorage.getItem('ausgaben');
+      const einnahmenJson = await getItem('einnahmen');
+      const ausgabenJson = await getItem('ausgaben');
 
       const einnahmen = einnahmenJson ? JSON.parse(einnahmenJson) : [];
       const ausgaben = ausgabenJson ? JSON.parse(ausgabenJson) : [];
@@ -126,10 +126,10 @@ export default function AlleTransaktionenScreen() {
           onPress: async () => {
             try {
               const storageKey = item.typ === 'einnahme' ? 'einnahmen' : 'ausgaben';
-              const jsonValue = await AsyncStorage.getItem(storageKey);
+              const jsonValue = await getItem(storageKey);
               let items = jsonValue ? JSON.parse(jsonValue) : [];
               const filteredItems = items.filter(i => i.id !== item.id);
-              await AsyncStorage.setItem(storageKey, JSON.stringify(filteredItems));
+              await setItem(storageKey, JSON.stringify(filteredItems));
               ladeDaten();
             } catch (e) {
               Alert.alert("Fehler", "Transaktion konnte nicht gelöscht werden.");

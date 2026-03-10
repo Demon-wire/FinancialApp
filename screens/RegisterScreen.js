@@ -10,9 +10,9 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
-import bcrypt from 'bcrypt-react-native'; // Import bcrypt
+import * as Crypto from 'expo-crypto';
 
 export default function RegisterScreen({ navigation, onRegister }) {
   const [name, setName] = useState('');
@@ -51,7 +51,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
 
     setLoading(true);
     try {
-      const usersJson = await AsyncStorage.getItem('users');
+      const usersJson = await getItem('users');
       const users = usersJson ? JSON.parse(usersJson) : [];
 
       if (users.find((u) => u.email === email.toLowerCase())) {
@@ -61,7 +61,12 @@ export default function RegisterScreen({ navigation, onRegister }) {
       }
 
       // Hash the password
-      const hashedPassword = await bcrypt.hash(password, 10); // 10 salt rounds
+      const salt = Crypto.randomUUID();
+      const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        password + salt
+      );
+      const hashedPassword = `sha256:${salt}:${hash}`;
 
       const newUser = {
         id: Date.now().toString(),
@@ -72,13 +77,13 @@ export default function RegisterScreen({ navigation, onRegister }) {
       };
 
       users.push(newUser);
-      await AsyncStorage.setItem('users', JSON.stringify(users));
+      await setItem('users', JSON.stringify(users));
 
-      await AsyncStorage.setItem('currentUser', JSON.stringify({
+      await setItem('currentUser', JSON.stringify({
         email: newUser.email,
         name: newUser.name,
       }));
-      await AsyncStorage.setItem('isLoggedIn', 'true');
+      await setItem('isLoggedIn', 'true');
 
       Alert.alert('Erfolg', `Willkommen, ${newUser.name}!`);
       onRegister();

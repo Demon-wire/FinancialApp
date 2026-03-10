@@ -15,13 +15,13 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.finanzapp.app",
+      "bundleIdentifier": "com.madlx.finanzapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.finanzapp.app",
+      "package": "com.madlx.finanzapp",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -35,21 +35,16 @@
       "eas": {
         "projectId": "b9267b04-b353-4075-84bd-184d54f85572"
       }
-<<<<<<< HEAD
-    }
-=======
     },
     "plugins": [
       "@react-native-community/datetimepicker",
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification_icon.png",
           "color": "#ffffff",
           "defaultChannel": "reminders"
         }
       ]
     ]
->>>>>>> dev
   }
 }

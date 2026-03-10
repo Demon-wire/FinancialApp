@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -48,7 +48,7 @@ export default function AusgabenScreen() {
     }
 
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
         Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
         return;
@@ -67,10 +67,10 @@ export default function AusgabenScreen() {
         typ: 'ausgabe',
       };
 
-      const gespeicherteAusgaben = await AsyncStorage.getItem('ausgaben');
+      const gespeicherteAusgaben = await getItem('ausgaben');
       const ausgaben = gespeicherteAusgaben ? JSON.parse(gespeicherteAusgaben) : [];
       ausgaben.push(neueAusgabe);
-      await AsyncStorage.setItem('ausgaben', JSON.stringify(ausgaben));
+      await setItem('ausgaben', JSON.stringify(ausgaben));
 
       Alert.alert('✅ Erfolg', 'Ausgabe wurde erfolgreich gespeichert!');
       setBetrag('');

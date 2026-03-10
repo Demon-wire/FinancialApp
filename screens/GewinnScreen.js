@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,7 +26,7 @@ export default function GewinnScreen() {
 
   const ladeDaten = async () => {
     try {
-      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
         setEinnahmen([]);
         setAusgaben([]);
@@ -37,7 +37,7 @@ export default function GewinnScreen() {
       const userEmail = currentUser.email;
 
       // Lade Einnahmen
-      const gespeicherteEinnahmen = await AsyncStorage.getItem('einnahmen');
+      const gespeicherteEinnahmen = await getItem('einnahmen');
       if (gespeicherteEinnahmen) {
         const alleEinnahmen = JSON.parse(gespeicherteEinnahmen);
         const einnahmenListe = alleEinnahmen.filter(
@@ -49,7 +49,7 @@ export default function GewinnScreen() {
       }
 
       // Lade Ausgaben
-      const gespeicherteAusgaben = await AsyncStorage.getItem('ausgaben');
+      const gespeicherteAusgaben = await getItem('ausgaben');
       if (gespeicherteAusgaben) {
         const alleAusgaben = JSON.parse(gespeicherteAusgaben);
         const ausgabenListe = alleAusgaben.filter(
@@ -61,7 +61,7 @@ export default function GewinnScreen() {
       }
 
       // Lade Abos
-      const gespeicherteAbos = await AsyncStorage.getItem('abos');
+      const gespeicherteAbos = await getItem('abos');
       if (gespeicherteAbos) {
         const alleAbos = JSON.parse(gespeicherteAbos);
         const abosListe = alleAbos.filter(
@@ -111,35 +111,47 @@ export default function GewinnScreen() {
     const totalAusgaben = gefilterteAusgaben.reduce((sum, t) => sum + t.betrag, 0);
 
     const totalAbos = abos.reduce((sum, abo) => {
-        const aboStart = new Date(abo.lastProcessed || abo.datum); // Fallback auf datum
+        const aboStart = new Date(abo.lastProcessed || abo.datum);
         const jetzt = new Date();
-        let anzahlMonate = 0;
-  
+        const intervall = abo.intervall || 'monatlich';
+
+        // Monatlicher Äquivalentbetrag je nach Intervall
+        let monatsBetrag;
+        if (intervall === 'wöchentlich') {
+          monatsBetrag = abo.betrag * (52 / 12); // ~4.33 Wochen/Monat
+        } else if (intervall === 'jährlich') {
+          monatsBetrag = abo.betrag / 12;
+        } else {
+          monatsBetrag = abo.betrag;
+        }
+
         switch (zeitraum) {
-          case 'woche':
-            // Vereinfachung: Wenn das Abo in der letzten Woche gestartet wurde, anteilig. Ansonsten voller Wochenanteil.
-             const wochenAnteil = 7 / 30; // grobe Annahme
-             return sum + abo.betrag * wochenAnteil;
-          case 'monat':
-            // Wenn das Abo diesen Monat gestartet wurde
-            if (aboStart.getFullYear() === jetzt.getFullYear() && aboStart.getMonth() === jetzt.getMonth()) {
-                return sum + abo.betrag;
-            } 
-            // Wenn das Abo schon länger läuft
-            else if (aboStart < jetzt) {
-                return sum + abo.betrag;
+          case 'woche': {
+            if (intervall === 'wöchentlich') {
+              return sum + abo.betrag;
+            }
+            return sum + monatsBetrag * (7 / 30);
+          }
+          case 'monat': {
+            if (aboStart <= jetzt) {
+              return sum + monatsBetrag;
             }
             return sum;
-          case 'jahr':
-            let start = new Date(jetzt.getFullYear(), 0, 1);
+          }
+          case 'jahr': {
             let monate = 0;
-            for(let m = start.getMonth(); m < jetzt.getMonth() + 1; m++) {
-                let aboAktivDiesenMonat = new Date(aboStart.getFullYear(), aboStart.getMonth(), 1) <= new Date(jetzt.getFullYear(), m, 1);
-                if (aboAktivDiesenMonat) {
-                    monate++;
-                }
+            for (let m = 0; m <= jetzt.getMonth(); m++) {
+              const aboAktiv = new Date(aboStart.getFullYear(), aboStart.getMonth(), 1) <= new Date(jetzt.getFullYear(), m, 1);
+              if (aboAktiv) monate++;
             }
-            return sum + (abo.betrag * monate);
+            if (intervall === 'wöchentlich') {
+              const wochen = Math.floor(monate * (52 / 12));
+              return sum + abo.betrag * wochen;
+            } else if (intervall === 'jährlich') {
+              return sum + (monate >= 1 ? abo.betrag : 0);
+            }
+            return sum + monatsBetrag * monate;
+          }
           default:
             return sum;
         }
