@@ -19,4 +19,4 @@ echo Die App oeffnet sich automatisch im Browser.
 echo Druecke Ctrl+C zum Beenden.
 echo.
 call npx expo start --web
-pause
+pause   
