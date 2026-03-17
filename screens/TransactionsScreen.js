@@ -3,10 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import EinnahmenScreen from './EinnahmenScreen';
 import AusgabenScreen from './AusgabenScreen';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function TransactionsScreen() {
   const { currentTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState('Einnahmen');
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState('income');
 
   return (
     <View style={{ flex: 1, backgroundColor: currentTheme.background }}>
@@ -14,28 +16,28 @@ export default function TransactionsScreen() {
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'Einnahmen' && { borderBottomColor: currentTheme.primary, borderBottomWidth: 2 },
+            activeTab === 'income' && { borderBottomColor: currentTheme.primary, borderBottomWidth: 2 },
           ]}
-          onPress={() => setActiveTab('Einnahmen')}
+          onPress={() => setActiveTab('income')}
         >
-          <Text style={[styles.tabText, { color: activeTab === 'Einnahmen' ? currentTheme.primary : 'gray' }]}>
-            Einnahmen
+          <Text style={[styles.tabText, { color: activeTab === 'income' ? currentTheme.primary : 'gray' }]}>
+            {t('transactions.incomeTab')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'Ausgaben' && { borderBottomColor: currentTheme.primary, borderBottomWidth: 2 },
+            activeTab === 'expense' && { borderBottomColor: currentTheme.primary, borderBottomWidth: 2 },
           ]}
-          onPress={() => setActiveTab('Ausgaben')}
+          onPress={() => setActiveTab('expense')}
         >
-          <Text style={[styles.tabText, { color: activeTab === 'Ausgaben' ? currentTheme.primary : 'gray' }]}>
-            Ausgaben
+          <Text style={[styles.tabText, { color: activeTab === 'expense' ? currentTheme.primary : 'gray' }]}>
+            {t('transactions.expensesTab')}
           </Text>
         </TouchableOpacity>
       </View>
       <View style={{ flex: 1 }}>
-        {activeTab === 'Einnahmen' ? <EinnahmenScreen /> : <AusgabenScreen />}
+        {activeTab === 'income' ? <EinnahmenScreen /> : <AusgabenScreen />}
       </View>
     </View>
   );

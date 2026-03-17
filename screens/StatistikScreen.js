@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
 } from 'react-native';
 import { getItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useFocusEffect } from '@react-navigation/native';
 
 const KATEGORIEN_EINNAHMEN = [
@@ -38,20 +35,23 @@ const KATEGORIEN_AUSGABEN = [
 ];
 
 function getCategoryDetails(categoryName, type) {
-    let categories = type === 'einnahmen' ? KATEGORIEN_EINNAHMEN : KATEGORIEN_AUSGABEN;
-    const foundCategory = categories.find(cat => cat.name === categoryName);
-    const result = foundCategory || { name: categoryName, icon: 'ellipse-outline', color: '#9E9E9E' };
-    return result;
+  let categories = type === 'einnahmen' ? KATEGORIEN_EINNAHMEN : KATEGORIEN_AUSGABEN;
+  const foundCategory = categories.find(cat => cat.name === categoryName);
+  return foundCategory || { name: categoryName, icon: 'ellipse-outline', color: '#9E9E9E' };
 }
+
+// Internal key for "all accounts"
+const ALL_ACCOUNTS_KEY = 'Alle Konten';
 
 export default function StatistikScreen() {
   const { currentTheme } = useTheme();
+  const { t, tName } = useLanguage();
   const [einnahmen, setEinnahmen] = useState([]);
   const [ausgaben, setAusgaben] = useState([]);
   const [zeitraum, setZeitraum] = useState('monat');
   const [typ, setTyp] = useState('einnahmen');
-  const [selectedAccount, setSelectedAccount] = useState('Alle Konten');
-  const [availableAccounts, setAvailableAccounts] = useState(['Alle Konten']);
+  const [selectedAccount, setSelectedAccount] = useState(ALL_ACCOUNTS_KEY);
+  const [availableAccounts, setAvailableAccounts] = useState([ALL_ACCOUNTS_KEY]);
 
   useFocusEffect(React.useCallback(() => { ladeDaten(); }, []));
 
@@ -61,48 +61,44 @@ export default function StatistikScreen() {
       if (!currentUserJson) {
         setEinnahmen([]);
         setAusgaben([]);
-        setAvailableAccounts(['Alle Konten']);
+        setAvailableAccounts([ALL_ACCOUNTS_KEY]);
         return;
       }
       const currentUser = JSON.parse(currentUserJson);
       const userEmail = currentUser.email;
 
-      let allAccounts = new Set(['Alle Konten']);
+      let allAccounts = new Set([ALL_ACCOUNTS_KEY]);
 
-      // Lade Einnahmen
       const gespeicherteEinnahmen = await getItem('einnahmen');
-      let einnahmenListe = [];
       if (gespeicherteEinnahmen) {
         const alleEinnahmen = JSON.parse(gespeicherteEinnahmen);
-        einnahmenListe = alleEinnahmen
+        const einnahmenListe = alleEinnahmen
           .filter((e) => e.userEmail === userEmail)
           .map(e => {
-              if (e.konto) allAccounts.add(e.konto);
-              return {
-                  ...e,
-                  icon: getCategoryDetails(e.kategorie, 'einnahmen').icon,
-                  color: getCategoryDetails(e.kategorie, 'einnahmen').color,
-              };
+            if (e.konto) allAccounts.add(e.konto);
+            return {
+              ...e,
+              icon: getCategoryDetails(e.kategorie, 'einnahmen').icon,
+              color: getCategoryDetails(e.kategorie, 'einnahmen').color,
+            };
           });
         setEinnahmen(einnahmenListe);
       } else {
         setEinnahmen([]);
       }
 
-      // Lade Ausgaben
       const gespeicherteAusgaben = await getItem('ausgaben');
-      let ausgabenListe = [];
       if (gespeicherteAusgaben) {
         const alleAusgaben = JSON.parse(gespeicherteAusgaben);
-        ausgabenListe = alleAusgaben
+        const ausgabenListe = alleAusgaben
           .filter((a) => a.userEmail === userEmail)
           .map(a => {
-              if (a.konto) allAccounts.add(a.konto);
-              return {
-                  ...a,
-                  icon: getCategoryDetails(a.kategorie, 'ausgaben').icon,
-                  color: getCategoryDetails(a.kategorie, 'ausgaben').color,
-              };
+            if (a.konto) allAccounts.add(a.konto);
+            return {
+              ...a,
+              icon: getCategoryDetails(a.kategorie, 'ausgaben').icon,
+              color: getCategoryDetails(a.kategorie, 'ausgaben').color,
+            };
           });
         setAusgaben(ausgabenListe);
       } else {
@@ -113,14 +109,13 @@ export default function StatistikScreen() {
       console.error('Fehler beim Laden der Daten:', error);
       setEinnahmen([]);
       setAusgaben([]);
-      setAvailableAccounts(['Alle Konten']);
+      setAvailableAccounts([ALL_ACCOUNTS_KEY]);
     }
   };
 
   const filtereNachZeitraumUndKonto = (transaktionen) => {
     const jetzt = new Date();
     let startDatum;
-
     switch (zeitraum) {
       case 'tag':
         startDatum = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
@@ -137,11 +132,10 @@ export default function StatistikScreen() {
       default:
         startDatum = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
     }
-
-    return transaktionen.filter((t) => {
-      const transaktionsDatum = new Date(t.datum);
+    return transaktionen.filter((tr) => {
+      const transaktionsDatum = new Date(tr.datum);
       const matchesTimeframe = transaktionsDatum >= startDatum;
-      const matchesAccount = selectedAccount === 'Alle Konten' || t.konto === selectedAccount;
+      const matchesAccount = selectedAccount === ALL_ACCOUNTS_KEY || tr.konto === selectedAccount;
       return matchesTimeframe && matchesAccount;
     });
   };
@@ -149,18 +143,14 @@ export default function StatistikScreen() {
   const berechneStatistik = () => {
     const transaktionen = typ === 'einnahmen' ? einnahmen : ausgaben;
     const gefilterteTransaktionen = filtereNachZeitraumUndKonto(transaktionen);
-    const gesamt = gefilterteTransaktionen.reduce((sum, t) => sum + t.betrag, 0);
+    const gesamt = gefilterteTransaktionen.reduce((sum, tr) => sum + tr.betrag, 0);
 
     const nachKategorie = {};
-    gefilterteTransaktionen.forEach((t) => {
-      if (nachKategorie[t.kategorie]) {
-        nachKategorie[t.kategorie].betrag += t.betrag;
+    gefilterteTransaktionen.forEach((tr) => {
+      if (nachKategorie[tr.kategorie]) {
+        nachKategorie[tr.kategorie].betrag += tr.betrag;
       } else {
-        nachKategorie[t.kategorie] = {
-            betrag: t.betrag,
-            icon: t.icon,
-            color: t.color,
-        };
+        nachKategorie[tr.kategorie] = { betrag: tr.betrag, icon: tr.icon, color: tr.color };
       }
     });
 
@@ -171,18 +161,14 @@ export default function StatistikScreen() {
 
   const formatDatum = (datumString) => {
     const datum = new Date(datumString);
-    return datum.toLocaleDateString('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const zeitraumLabels = {
-    tag: 'Heute',
-    woche: 'Letzte Woche',
-    monat: 'Dieser Monat',
-    jahr: 'Dieses Jahr',
+    tag: t('statistics.today'),
+    woche: t('statistics.lastWeek'),
+    monat: t('statistics.thisMonth'),
+    jahr: t('statistics.thisYear'),
   };
 
   const zeitraumIcons = {
@@ -192,20 +178,29 @@ export default function StatistikScreen() {
     jahr: 'calendar-number',
   };
 
+  const zeitraumButtonLabels = {
+    tag: t('statistics.day'),
+    woche: t('statistics.week'),
+    monat: t('statistics.month'),
+    jahr: t('statistics.year'),
+  };
+
   const gefilterteTransaktionen = filtereNachZeitraumUndKonto(typ === 'einnahmen' ? einnahmen : ausgaben);
-  const sortedKategorien = Object.entries(nachKategorie)
-    .sort((a, b) => b[1].betrag - a[1].betrag);
+  const sortedKategorien = Object.entries(nachKategorie).sort((a, b) => b[1].betrag - a[1].betrag);
+
+  const typLabel = typ === 'einnahmen' ? t('statistics.income') : t('statistics.expenses');
+  const accountLabel = selectedAccount === ALL_ACCOUNTS_KEY ? t('statistics.allAccounts') : tName(selectedAccount);
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: currentTheme.background }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header mit Zeitraum-Auswahl und Konto-Auswahl */}
+      {/* Header */}
       <View style={[styles.headerCard, { backgroundColor: currentTheme.cardBackground }]}>
         <View style={styles.headerTitleRow}>
           <Ionicons name="stats-chart" size={32} color={currentTheme.primary} />
-          <Text style={[styles.headerTitle, { color: currentTheme.text }]}>Statistik</Text>
+          <Text style={[styles.headerTitle, { color: currentTheme.text }]}>{t('statistics.title')}</Text>
         </View>
         <View style={styles.zeitraumButtons}>
           {['tag', 'woche', 'monat', 'jahr'].map((z) => (
@@ -213,30 +208,15 @@ export default function StatistikScreen() {
               key={z}
               style={[
                 styles.zeitraumButton,
-                {
-                  backgroundColor: zeitraum === z ? currentTheme.primary : currentTheme.surface,
-                  borderColor: currentTheme.border,
-                },
+                { backgroundColor: zeitraum === z ? currentTheme.primary : currentTheme.surface, borderColor: currentTheme.border },
                 zeitraum === z && styles.zeitraumButtonAktiv,
               ]}
               onPress={() => setZeitraum(z)}
               activeOpacity={0.7}
             >
-              <Ionicons
-                name={zeitraumIcons[z]}
-                size={18}
-                color={zeitraum === z ? '#fff' : currentTheme.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.zeitraumButtonText,
-                  {
-                    color: zeitraum === z ? '#fff' : currentTheme.text,
-                    fontWeight: zeitraum === z ? '600' : '400',
-                  },
-                ]}
-              >
-                {z === 'tag' ? 'Tag' : z === 'woche' ? 'Woche' : z === 'monat' ? 'Monat' : 'Jahr'}
+              <Ionicons name={zeitraumIcons[z]} size={18} color={zeitraum === z ? '#fff' : currentTheme.textSecondary} />
+              <Text style={[styles.zeitraumButtonText, { color: zeitraum === z ? '#fff' : currentTheme.text, fontWeight: zeitraum === z ? '600' : '400' }]}>
+                {zeitraumButtonLabels[z]}
               </Text>
             </TouchableOpacity>
           ))}
@@ -249,25 +229,14 @@ export default function StatistikScreen() {
               key={accountName}
               style={[
                 styles.accountButton,
-                {
-                  backgroundColor: selectedAccount === accountName ? currentTheme.primary : currentTheme.surface,
-                  borderColor: currentTheme.border,
-                },
+                { backgroundColor: selectedAccount === accountName ? currentTheme.primary : currentTheme.surface, borderColor: currentTheme.border },
                 selectedAccount === accountName && styles.accountButtonActive,
               ]}
               onPress={() => setSelectedAccount(accountName)}
               activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.accountButtonText,
-                  {
-                    color: selectedAccount === accountName ? '#fff' : currentTheme.text,
-                    fontWeight: selectedAccount === accountName ? '600' : '400',
-                  },
-                ]}
-              >
-                {accountName}
+              <Text style={[styles.accountButtonText, { color: selectedAccount === accountName ? '#fff' : currentTheme.text, fontWeight: selectedAccount === accountName ? '600' : '400' }]}>
+                {accountName === ALL_ACCOUNTS_KEY ? t('statistics.allAccounts') : tName(accountName)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -278,13 +247,13 @@ export default function StatistikScreen() {
             style={[styles.typButton, typ === 'einnahmen' && { backgroundColor: currentTheme.primary }]}
             onPress={() => setTyp('einnahmen')}
           >
-            <Text style={[styles.typButtonText, typ === 'einnahmen' && { color: '#fff' }]}>Einnahmen</Text>
+            <Text style={[styles.typButtonText, typ === 'einnahmen' && { color: '#fff' }]}>{t('statistics.income')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.typButton, typ === 'ausgaben' && { backgroundColor: currentTheme.primary }]}
             onPress={() => setTyp('ausgaben')}
           >
-            <Text style={[styles.typButtonText, typ === 'ausgaben' && { color: '#fff' }]}>Ausgaben</Text>
+            <Text style={[styles.typButtonText, typ === 'ausgaben' && { color: '#fff' }]}>{t('statistics.expenses')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -294,12 +263,12 @@ export default function StatistikScreen() {
         <View style={[styles.gesamtBox, { backgroundColor: currentTheme.primary }]}>
           <Ionicons name="wallet" size={40} color="#fff" />
           <Text style={styles.gesamtLabel}>
-            {zeitraumLabels[zeitraum]} ({selectedAccount === 'Alle Konten' ? 'Alle Konten' : selectedAccount}) ({typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'})
+            {zeitraumLabels[zeitraum]} ({accountLabel}) ({typLabel})
           </Text>
           <Text style={styles.gesamtBetrag}>{gesamt.toFixed(2)} €</Text>
           <View style={styles.gesamtInfoRow}>
             <Ionicons name="receipt-outline" size={16} color="#fff" style={{ opacity: 0.9 }} />
-            <Text style={styles.gesamtAnzahl}>{anzahl} {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'}</Text>
+            <Text style={styles.gesamtAnzahl}>{anzahl} {typLabel}</Text>
           </View>
         </View>
 
@@ -307,13 +276,13 @@ export default function StatistikScreen() {
         <View style={[styles.kategorienBox, { backgroundColor: currentTheme.cardBackground }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="grid" size={24} color={currentTheme.primary} />
-            <Text style={[styles.kategorienTitle, { color: currentTheme.text }]}>Nach Kategorien</Text>
+            <Text style={[styles.kategorienTitle, { color: currentTheme.text }]}>{t('statistics.byCategory')}</Text>
           </View>
           {sortedKategorien.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="bar-chart-outline" size={48} color={currentTheme.textSecondary} />
               <Text style={[styles.keineDaten, { color: currentTheme.textSecondary }]}>
-                Keine {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'} in diesem Zeitraum für {selectedAccount}
+                {t('statistics.noData', { type: typLabel, account: accountLabel })}
               </Text>
             </View>
           ) : (
@@ -326,7 +295,7 @@ export default function StatistikScreen() {
                       <Ionicons name={icon} size={20} color={color} />
                     </View>
                     <View style={styles.kategorieInfo}>
-                      <Text style={[styles.kategorieName, { color: currentTheme.text }]}>{kategorieName}</Text>
+                      <Text style={[styles.kategorieName, { color: currentTheme.text }]}>{tName(kategorieName)}</Text>
                       <Text style={[styles.kategorieProzent, { color: currentTheme.textSecondary }]}>
                         {prozent.toFixed(1)}%
                       </Text>
@@ -336,12 +305,7 @@ export default function StatistikScreen() {
                     </Text>
                   </View>
                   <View style={[styles.progressBar, { backgroundColor: currentTheme.border }]}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${prozent}%`, backgroundColor: color }
-                      ]}
-                    />
+                    <View style={[styles.progressFill, { width: `${prozent}%`, backgroundColor: color }]} />
                   </View>
                 </View>
               );
@@ -354,14 +318,14 @@ export default function StatistikScreen() {
           <View style={styles.sectionHeader}>
             <Ionicons name="time-outline" size={24} color={currentTheme.primary} />
             <Text style={[styles.verlaufTitle, { color: currentTheme.text }]}>
-              Letzte {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'}
+              {t('statistics.recent', { type: typLabel })}
             </Text>
           </View>
           {gefilterteTransaktionen.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={48} color={currentTheme.textSecondary} />
               <Text style={[styles.keineDaten, { color: currentTheme.textSecondary }]}>
-                Noch keine {typ === 'einnahmen' ? 'Einnahmen' : 'Ausgaben'} erfasst für {selectedAccount}
+                {t('statistics.noDataYet', { type: typLabel, account: accountLabel })}
               </Text>
             </View>
           ) : (
@@ -369,17 +333,14 @@ export default function StatistikScreen() {
               .sort((a, b) => new Date(b.datum) - new Date(a.datum))
               .slice(0, 10)
               .map((transaktion) => (
-                <View
-                  key={transaktion.id}
-                  style={[styles.einnahmeItem, { borderBottomColor: currentTheme.border }]}
-                >
+                <View key={transaktion.id} style={[styles.einnahmeItem, { borderBottomColor: currentTheme.border }]}>
                   <View style={styles.einnahmeLeft}>
                     <View style={[styles.einnahmeIconContainer, { backgroundColor: `${transaktion.color}20` }]}>
                       <Ionicons name={transaktion.icon} size={20} color={transaktion.color} />
                     </View>
                     <View style={styles.einnahmeInfo}>
                       <Text style={[styles.einnahmeKategorie, { color: currentTheme.text }]}>
-                        {transaktion.kategorie}
+                        {tName(transaktion.kategorie)}
                       </Text>
                       <View style={styles.einnahmeMeta}>
                         <Ionicons name="calendar-outline" size={12} color={currentTheme.textSecondary} />
@@ -410,253 +371,69 @@ export default function StatistikScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   headerCard: {
     padding: 20,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
   },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  zeitraumButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  headerTitle: { fontSize: 28, fontWeight: 'bold' },
+  zeitraumButtons: { flexDirection: 'row', gap: 12 },
   zeitraumButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 12, borderWidth: 1, gap: 6,
   },
   zeitraumButtonAktiv: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4,
   },
-  zeitraumButtonText: {
-    fontSize: 14,
-  },
-  accountButtonsContainer: {
-    flexDirection: 'row',
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  accountButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginRight: 10,
-  },
+  zeitraumButtonText: { fontSize: 14 },
+  accountButtonsContainer: { flexDirection: 'row', marginTop: 15, marginBottom: 10 },
+  accountButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, borderWidth: 1, marginRight: 10 },
   accountButtonActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4,
   },
-  accountButtonText: {
-    fontSize: 14,
-  },
-  typButtons: {
-    flexDirection: 'row',
-    marginTop: 20,
-    backgroundColor: '#eee',
-    borderRadius: 12,
-    padding: 4,
-  },
-  typButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  typButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
-  },
-  statistikContainer: {
-    padding: 20,
-    gap: 20,
-  },
+  accountButtonText: { fontSize: 14 },
+  typButtons: { flexDirection: 'row', marginTop: 20, backgroundColor: '#eee', borderRadius: 12, padding: 4 },
+  typButton: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  typButtonText: { fontSize: 14, fontWeight: '600', color: '#000' },
+  statistikContainer: { padding: 20, gap: 20 },
   gesamtBox: {
-    borderRadius: 20,
-    padding: 28,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderRadius: 20, padding: 28, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
   },
-  gesamtLabel: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.9,
-    marginTop: 12,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  gesamtBetrag: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  gesamtInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  gesamtAnzahl: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.9,
-  },
+  gesamtLabel: { fontSize: 14, color: '#fff', opacity: 0.9, marginTop: 12, marginBottom: 8, textAlign: 'center' },
+  gesamtBetrag: { fontSize: 42, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
+  gesamtInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  gesamtAnzahl: { fontSize: 14, color: '#fff', opacity: 0.9 },
   kategorienBox: {
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 20, padding: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-  },
-  kategorienTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  kategorieItem: {
-    marginBottom: 20,
-  },
-  kategorieHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 12,
-  },
-  kategorieIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  kategorieInfo: {
-    flex: 1,
-  },
-  kategorieName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  kategorieProzent: {
-    fontSize: 12,
-  },
-  kategorieBetrag: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  progressBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  kategorienTitle: { fontSize: 20, fontWeight: 'bold' },
+  kategorieItem: { marginBottom: 20 },
+  kategorieHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 12 },
+  kategorieIconContainer: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  kategorieInfo: { flex: 1 },
+  kategorieName: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
+  kategorieProzent: { fontSize: 12 },
+  kategorieBetrag: { fontSize: 18, fontWeight: 'bold' },
+  progressBar: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3 },
   verlaufBox: {
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 20, padding: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5,
   },
-  verlaufTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  einnahmeItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  einnahmeLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  einnahmeIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  einnahmeInfo: {
-    flex: 1,
-  },
-  einnahmeKategorie: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  einnahmeMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  einnahmeDatum: {
-    fontSize: 12,
-  },
-  einnahmeNotiz: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  einnahmeBetrag: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    gap: 12,
-  },
-  keineDaten: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
+  verlaufTitle: { fontSize: 20, fontWeight: 'bold' },
+  einnahmeItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1 },
+  einnahmeLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  einnahmeIconContainer: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  einnahmeInfo: { flex: 1 },
+  einnahmeKategorie: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  einnahmeMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  einnahmeDatum: { fontSize: 12 },
+  einnahmeNotiz: { fontSize: 12, fontStyle: 'italic' },
+  einnahmeBetrag: { fontSize: 18, fontWeight: 'bold' },
+  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  keineDaten: { fontSize: 14, textAlign: 'center' },
 });

@@ -13,12 +13,14 @@ import {
 import { getItem, setItem, removeItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, THEMES } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 export default function EinstellungenScreen({ onLogout }) {
   const { currentTheme, theme, changeTheme, availableThemes } = useTheme();
+  const { t, tName, language, changeLanguage } = useLanguage();
   const [email, setEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -48,7 +50,7 @@ export default function EinstellungenScreen({ onLogout }) {
 
   const handleEmailChange = async () => {
     if (!email || !email.includes('@')) {
-      Alert.alert('Fehler', 'Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+      Alert.alert(t('common.error'), t('settings.emailInvalid'));
       return;
     }
 
@@ -56,7 +58,7 @@ export default function EinstellungenScreen({ onLogout }) {
     try {
       const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
-        Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
+        Alert.alert(t('common.error'), t('settings.notLoggedIn'));
         return;
       }
 
@@ -71,7 +73,7 @@ export default function EinstellungenScreen({ onLogout }) {
           (u) => u.email.toLowerCase() === email.toLowerCase()
         );
         if (emailExists) {
-          Alert.alert('Fehler', 'Diese E-Mail-Adresse ist bereits registriert.');
+          Alert.alert(t('common.error'), t('settings.emailExists'));
           setLoading(false);
           return;
         }
@@ -121,9 +123,9 @@ export default function EinstellungenScreen({ onLogout }) {
 
       await setItem('lastLoggedInUser', email.toLowerCase());
 
-      Alert.alert('✅ Erfolg', 'E-Mail-Adresse wurde erfolgreich geändert.');
+      Alert.alert(t('common.success'), t('settings.emailChanged'));
     } catch (error) {
-      Alert.alert('Fehler', 'E-Mail-Adresse konnte nicht geändert werden.');
+      Alert.alert(t('common.error'), t('settings.emailError'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -132,17 +134,17 @@ export default function EinstellungenScreen({ onLogout }) {
 
   const handlePasswordChange = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Fehler', 'Bitte füllen Sie alle Felder aus.');
+      Alert.alert(t('common.error'), t('settings.fillAllFields'));
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Fehler', 'Das neue Passwort muss mindestens 6 Zeichen lang sein.');
+      Alert.alert(t('common.error'), t('settings.passwordTooShort'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Fehler', 'Die neuen Passwörter stimmen nicht überein.');
+      Alert.alert(t('common.error'), t('settings.passwordMismatch'));
       return;
     }
 
@@ -150,7 +152,7 @@ export default function EinstellungenScreen({ onLogout }) {
     try {
       const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
-        Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
+        Alert.alert(t('common.error'), t('settings.notLoggedIn'));
         return;
       }
 
@@ -161,7 +163,7 @@ export default function EinstellungenScreen({ onLogout }) {
 
       const user = users.find((u) => u.email === currentUser.email);
       if (!user) {
-        Alert.alert('Fehler', 'Benutzer nicht gefunden.');
+        Alert.alert(t('common.error'), t('settings.userNotFound'));
         setLoading(false);
         return;
       }
@@ -179,7 +181,7 @@ export default function EinstellungenScreen({ onLogout }) {
       }
 
       if (!passwordMatch) {
-        Alert.alert('Fehler', 'Das aktuelle Passwort ist falsch.');
+        Alert.alert(t('common.error'), t('settings.wrongPassword'));
         setLoading(false);
         return;
       }
@@ -192,12 +194,12 @@ export default function EinstellungenScreen({ onLogout }) {
       user.password = `sha256:${salt}:${hash}`;
       await setItem('users', JSON.stringify(users));
 
-      Alert.alert('✅ Erfolg', 'Passwort wurde erfolgreich geändert.');
+      Alert.alert(t('common.success'), t('settings.passwordChanged'));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
-      Alert.alert('Fehler', 'Passwort konnte nicht geändert werden.');
+      Alert.alert(t('common.error'), t('settings.passwordError'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -208,7 +210,7 @@ export default function EinstellungenScreen({ onLogout }) {
     try {
       const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
-        Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
+        Alert.alert(t('common.error'), t('settings.notLoggedIn'));
         return;
       }
       const currentUser = JSON.parse(currentUserJson);
@@ -221,10 +223,10 @@ export default function EinstellungenScreen({ onLogout }) {
       const ausgaben = ausgabenJson ? JSON.parse(ausgabenJson).filter(a => a.userEmail === userEmail) : [];
 
       const header = 'Datum,Typ,Kategorie,Betrag,Konto,Notiz\n';
-      const formatRow = (t, typ) => {
-        const datum = new Date(t.datum).toLocaleDateString('de-DE');
-        const notiz = (t.notiz || '').replace(/,/g, ';').replace(/\n/g, ' ');
-        return `${datum},${typ},${t.kategorie},${t.betrag.toFixed(2)},${t.konto || ''},${notiz}`;
+      const formatRow = (tr, typ) => {
+        const datum = new Date(tr.datum).toLocaleDateString('de-DE');
+        const notiz = (tr.notiz || '').replace(/,/g, ';').replace(/\n/g, ' ');
+        return `${datum},${typ},${tr.kategorie},${tr.betrag.toFixed(2)},${tr.konto || ''},${notiz}`;
       };
 
       const rows = [
@@ -238,33 +240,33 @@ export default function EinstellungenScreen({ onLogout }) {
 
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Transaktionen exportieren' });
+        await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: t('settings.exportDialogTitle') });
       } else {
-        Alert.alert('Info', `Datei gespeichert unter: ${fileUri}`);
+        Alert.alert(t('common.info'), t('settings.fileSaved', { path: fileUri }));
       }
     } catch (error) {
-      Alert.alert('Fehler', 'Export konnte nicht durchgeführt werden.');
+      Alert.alert(t('common.error'), t('settings.exportError'));
       console.error(error);
     }
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Konto löschen',
-      'Möchten Sie Ihr Konto wirklich dauerhaft löschen? Alle Ihre Daten und Einnahmen werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',
+      t('settings.deleteAccountTitle'),
+      t('settings.deleteAccountMessage'),
       [
         {
-          text: 'Abbrechen',
+          text: t('settings.deleteAccountCancel'),
           style: 'cancel',
         },
         {
-          text: 'Löschen',
+          text: t('settings.deleteAccountConfirm'),
           style: 'destructive',
           onPress: async () => {
             try {
               const currentUserJson = await getItem('currentUser');
               if (!currentUserJson) {
-                Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
+                Alert.alert(t('common.error'), t('settings.notLoggedIn'));
                 return;
               }
 
@@ -302,10 +304,10 @@ export default function EinstellungenScreen({ onLogout }) {
               await removeItem('currentUser');
               await removeItem('isLoggedIn');
 
-              Alert.alert('Erfolg', 'Ihr Konto wurde erfolgreich gelöscht.');
+              Alert.alert(t('common.success'), t('settings.deleteAccountSuccess'));
               onLogout();
             } catch (error) {
-              Alert.alert('Fehler', 'Konto konnte nicht gelöscht werden.');
+              Alert.alert(t('common.error'), t('settings.deleteAccountError'));
               console.error(error);
             }
           },
@@ -337,14 +339,14 @@ export default function EinstellungenScreen({ onLogout }) {
           <View style={styles.sectionHeader}>
             <Ionicons name="mail" size={24} color={currentTheme.primary} />
             <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>
-              E-Mail-Adresse ändern
+              {t('settings.changeEmail')}
             </Text>
           </View>
           <View style={[styles.inputContainer, { borderColor: currentTheme.border }]}>
             <Ionicons name="mail-outline" size={20} color={currentTheme.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: currentTheme.text }]}
-              placeholder="Neue E-Mail-Adresse"
+              placeholder={t('settings.newEmail')}
               placeholderTextColor={currentTheme.textSecondary}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -359,7 +361,7 @@ export default function EinstellungenScreen({ onLogout }) {
             activeOpacity={0.8}
           >
             <Ionicons name="checkmark-circle" size={20} color="#fff" />
-            <Text style={styles.buttonText}>E-Mail ändern</Text>
+            <Text style={styles.buttonText}>{t('settings.changeEmailButton')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -368,14 +370,14 @@ export default function EinstellungenScreen({ onLogout }) {
           <View style={styles.sectionHeader}>
             <Ionicons name="lock-closed" size={24} color={currentTheme.primary} />
             <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>
-              Passwort ändern
+              {t('settings.changePassword')}
             </Text>
           </View>
           <View style={[styles.inputContainer, { borderColor: currentTheme.border }]}>
             <Ionicons name="lock-closed-outline" size={20} color={currentTheme.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: currentTheme.text }]}
-              placeholder="Aktuelles Passwort"
+              placeholder={t('settings.currentPassword')}
               placeholderTextColor={currentTheme.textSecondary}
               secureTextEntry={!showCurrentPassword}
               value={currentPassword}
@@ -389,7 +391,7 @@ export default function EinstellungenScreen({ onLogout }) {
             <Ionicons name="lock-closed-outline" size={20} color={currentTheme.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: currentTheme.text }]}
-              placeholder="Neues Passwort"
+              placeholder={t('settings.newPassword')}
               placeholderTextColor={currentTheme.textSecondary}
               secureTextEntry={!showNewPassword}
               value={newPassword}
@@ -403,7 +405,7 @@ export default function EinstellungenScreen({ onLogout }) {
             <Ionicons name="lock-closed-outline" size={20} color={currentTheme.textSecondary} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { color: currentTheme.text }]}
-              placeholder="Neues Passwort bestätigen"
+              placeholder={t('settings.confirmPassword')}
               placeholderTextColor={currentTheme.textSecondary}
               secureTextEntry={!showConfirmPassword}
               value={confirmPassword}
@@ -420,7 +422,7 @@ export default function EinstellungenScreen({ onLogout }) {
             activeOpacity={0.8}
           >
             <Ionicons name="checkmark-circle" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Passwort ändern</Text>
+            <Text style={styles.buttonText}>{t('settings.changePasswordButton')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -429,7 +431,7 @@ export default function EinstellungenScreen({ onLogout }) {
           <View style={styles.sectionHeader}>
             <Ionicons name="color-palette" size={24} color={currentTheme.primary} />
             <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>
-              Theme auswählen
+              {t('settings.selectTheme')}
             </Text>
           </View>
           <View style={styles.themeContainer}>
@@ -455,10 +457,52 @@ export default function EinstellungenScreen({ onLogout }) {
                     <View style={[styles.themePreviewAccent, { backgroundColor: themeData.primary }]} />
                   </View>
                   <Text style={[styles.themeName, { color: currentTheme.text }]}>
-                    {themeData.name}
+                    {tName(themeData.name)}
                   </Text>
                   {isSelected && (
                     <View style={[styles.checkmark, { backgroundColor: currentTheme.primary }]}>
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Sprache auswählen */}
+        <View style={[styles.section, { backgroundColor: currentTheme.cardBackground }]}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="language" size={24} color={currentTheme.primary} />
+            <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>
+              {t('settings.selectLanguage')}
+            </Text>
+          </View>
+          <View style={styles.themeContainer}>
+            {['en', 'de', 'hi', 'zh', 'it', 'es'].map((lang) => {
+              const isSelected = language === lang;
+              return (
+                <TouchableOpacity
+                  key={lang}
+                  style={[
+                    styles.langButton,
+                    {
+                      backgroundColor: isSelected ? currentTheme.primary : currentTheme.surface,
+                      borderColor: isSelected ? currentTheme.primary : currentTheme.border,
+                      borderWidth: isSelected ? 3 : 2,
+                    },
+                  ]}
+                  onPress={() => changeLanguage(lang)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.langCode, { color: isSelected ? '#fff' : currentTheme.primary }]}>
+                    {lang.toUpperCase()}
+                  </Text>
+                  <Text style={[styles.langName, { color: isSelected ? '#fff' : currentTheme.text }]}>
+                    {tName(lang)}
+                  </Text>
+                  {isSelected && (
+                    <View style={[styles.checkmark, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
                       <Ionicons name="checkmark" size={16} color="#fff" />
                     </View>
                   )}
@@ -473,7 +517,7 @@ export default function EinstellungenScreen({ onLogout }) {
           <View style={styles.sectionHeader}>
             <Ionicons name="download-outline" size={24} color={currentTheme.primary} />
             <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>
-              Daten exportieren
+              {t('settings.exportData')}
             </Text>
           </View>
           <TouchableOpacity
@@ -482,7 +526,7 @@ export default function EinstellungenScreen({ onLogout }) {
             activeOpacity={0.8}
           >
             <Ionicons name="document-text-outline" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Transaktionen als CSV exportieren</Text>
+            <Text style={styles.buttonText}>{t('settings.exportCSV')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -491,7 +535,7 @@ export default function EinstellungenScreen({ onLogout }) {
           <View style={styles.sectionHeader}>
             <Ionicons name="warning" size={24} color="#d32f2f" />
             <Text style={[styles.sectionTitle, { color: '#d32f2f' }]}>
-              Gefährliche Aktionen
+              {t('settings.dangerZone')}
             </Text>
           </View>
           <TouchableOpacity
@@ -501,7 +545,7 @@ export default function EinstellungenScreen({ onLogout }) {
           >
             <Ionicons name="trash" size={20} color="#d32f2f" />
             <Text style={[styles.deleteButtonText, { color: '#d32f2f' }]}>
-              Konto dauerhaft löschen
+              {t('settings.deleteAccount')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -511,165 +555,58 @@ export default function EinstellungenScreen({ onLogout }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  container: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
   userCard: {
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
   },
   userIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
+    width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.9,
-  },
+  userName: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 4 },
+  userEmail: { fontSize: 14, color: '#fff', opacity: 0.9 },
   section: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 20, padding: 20, marginBottom: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: 12,
-    marginBottom: 12,
-    paddingHorizontal: 16,
-    height: 50,
+    flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderRadius: 12,
+    marginBottom: 12, paddingHorizontal: 16, height: 50,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-  },
-  eyeIcon: {
-    padding: 4,
-  },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 16 },
+  eyeIcon: { padding: 4 },
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 8,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    padding: 16, borderRadius: 12, marginTop: 8, gap: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  themeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  themeButton: {
-    width: 110,
-    padding: 12,
-    borderRadius: 16,
-    alignItems: 'center',
-    position: 'relative',
-  },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  themeContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  themeButton: { width: 110, padding: 12, borderRadius: 16, alignItems: 'center', position: 'relative' },
   themePreview: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-    marginBottom: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
+    width: 70, height: 70, borderRadius: 12, marginBottom: 8,
+    justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden',
   },
-  themePreviewCard: {
-    width: 50,
-    height: 30,
-    borderRadius: 6,
-    position: 'absolute',
-    top: 10,
+  themePreviewCard: { width: 50, height: 30, borderRadius: 6, position: 'absolute', top: 10 },
+  themePreviewAccent: { width: 20, height: 20, borderRadius: 4, position: 'absolute', bottom: 10, right: 10 },
+  themeName: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  langButton: {
+    width: 130, padding: 16, borderRadius: 16, alignItems: 'center', position: 'relative',
   },
-  themePreviewAccent: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-  },
-  themeName: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
+  langCode: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
+  langName: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
   checkmark: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', top: 8, right: 8, width: 24, height: 24,
+    borderRadius: 12, justifyContent: 'center', alignItems: 'center',
   },
   deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    padding: 16, borderRadius: 12, borderWidth: 2, gap: 8,
   },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  deleteButtonText: { fontSize: 16, fontWeight: 'bold' },
 });

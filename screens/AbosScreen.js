@@ -3,12 +3,15 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } 
 import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useFocusEffect } from '@react-navigation/native';
 
+// Internal keys (stored in DB)
 const INTERVALLE = ['monatlich', 'wöchentlich', 'jährlich'];
 
 export default function AbosScreen() {
   const { currentTheme } = useTheme();
+  const { t, tName } = useLanguage();
   const [abos, setAbos] = useState([]);
   const [name, setName] = useState('');
   const [betrag, setBetrag] = useState('');
@@ -36,14 +39,14 @@ export default function AbosScreen() {
 
   const speichereAbo = async () => {
     if (!name || !betrag || parseFloat(betrag) <= 0) {
-      Alert.alert('Fehler', 'Bitte geben Sie einen gültigen Namen und Betrag ein.');
+      Alert.alert(t('common.error'), t('subscriptions.invalidInput'));
       return;
     }
 
     try {
       const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
-        Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
+        Alert.alert(t('common.error'), t('common.notLoggedIn'));
         return;
       }
       const currentUser = JSON.parse(currentUserJson);
@@ -63,13 +66,13 @@ export default function AbosScreen() {
       alleAbos.push(neuesAbo);
       await setItem('abos', JSON.stringify(alleAbos));
 
-      Alert.alert('✅ Erfolg', 'Abonnement wurde erfolgreich gespeichert!');
+      Alert.alert(t('common.success'), t('subscriptions.saved'));
       setName('');
       setBetrag('');
       setIntervall('monatlich');
       ladeAbos();
     } catch (error) {
-      Alert.alert('Fehler', 'Abonnement konnte nicht gespeichert werden.');
+      Alert.alert(t('common.error'), t('subscriptions.saveError'));
       console.error(error);
     }
   };
@@ -84,15 +87,22 @@ export default function AbosScreen() {
         ladeAbos();
       }
     } catch (error) {
-      Alert.alert('Fehler', 'Abonnement konnte nicht gelöscht werden.');
+      Alert.alert(t('common.error'), t('subscriptions.deleteError'));
       console.error(error);
     }
   };
 
   const intervallLabel = (i) => {
-    if (i === 'wöchentlich') return '/ Woche';
-    if (i === 'jährlich') return '/ Jahr';
-    return '/ Monat';
+    if (i === 'wöchentlich') return t('subscriptions.perWeek') || '/ week';
+    if (i === 'jährlich') return t('subscriptions.perYear') || '/ year';
+    return t('subscriptions.perMonth') || '/ month';
+  };
+
+  // Translations for interval display labels
+  const INTERVALL_LABELS = {
+    monatlich: t('names.monatlich'),
+    wöchentlich: t('names.wöchentlich'),
+    jährlich: t('names.jährlich'),
   };
 
   const renderItem = ({ item }) => (
@@ -113,23 +123,23 @@ export default function AbosScreen() {
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
       <View style={[styles.formCard, { backgroundColor: currentTheme.cardBackground }]}>
-        <Text style={[styles.formTitle, { color: currentTheme.text }]}>Neues Abo hinzufügen</Text>
+        <Text style={[styles.formTitle, { color: currentTheme.text }]}>{t('subscriptions.addTitle')}</Text>
         <TextInput
           style={[styles.input, { color: currentTheme.text, borderColor: currentTheme.border }]}
-          placeholder="Name des Abos (z.B. Netflix)"
+          placeholder={t('subscriptions.namePlaceholder')}
           placeholderTextColor={currentTheme.textSecondary}
           value={name}
           onChangeText={setName}
         />
         <TextInput
           style={[styles.input, { color: currentTheme.text, borderColor: currentTheme.border }]}
-          placeholder="Betrag"
+          placeholder={t('subscriptions.amountPlaceholder')}
           placeholderTextColor={currentTheme.textSecondary}
           keyboardType="decimal-pad"
           value={betrag}
           onChangeText={setBetrag}
         />
-        <Text style={[styles.intervallLabel, { color: currentTheme.text }]}>Intervall</Text>
+        <Text style={[styles.intervallLabel, { color: currentTheme.text }]}>{t('subscriptions.interval')}</Text>
         <View style={styles.intervallContainer}>
           {INTERVALLE.map((iv) => (
             <TouchableOpacity
@@ -144,13 +154,13 @@ export default function AbosScreen() {
               onPress={() => setIntervall(iv)}
             >
               <Text style={[styles.intervallButtonText, { color: intervall === iv ? '#fff' : currentTheme.text }]}>
-                {iv.charAt(0).toUpperCase() + iv.slice(1)}
+                {INTERVALL_LABELS[iv]}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
         <TouchableOpacity style={[styles.speichernButton, { backgroundColor: currentTheme.primary }]} onPress={speichereAbo}>
-          <Text style={styles.speichernButtonText}>Abo speichern</Text>
+          <Text style={styles.speichernButtonText}>{t('subscriptions.saveButton')}</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -162,7 +172,7 @@ export default function AbosScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="reader-outline" size={48} color={currentTheme.textSecondary} />
             <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>
-              Keine Abonnements gefunden.
+              {t('subscriptions.empty')}
             </Text>
           </View>
         )}
@@ -172,85 +182,21 @@ export default function AbosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  formCard: {
-    padding: 20,
-    margin: 20,
-    borderRadius: 12,
-  },
-  formTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  input: {
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  intervallLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  intervallContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  intervallButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  intervallButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  speichernButton: {
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  speichernButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  listContainer: {
-    paddingHorizontal: 20,
-  },
-  aboItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  aboInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  aboName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  aboBetrag: {
-    fontSize: 14,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
+  container: { flex: 1 },
+  formCard: { padding: 20, margin: 20, borderRadius: 12 },
+  formTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
+  input: { height: 50, borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, marginBottom: 12 },
+  intervallLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  intervallContainer: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  intervallButton: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  intervallButtonText: { fontSize: 13, fontWeight: '600' },
+  speichernButton: { padding: 16, borderRadius: 8, alignItems: 'center' },
+  speichernButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  listContainer: { paddingHorizontal: 20 },
+  aboItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
+  aboInfo: { flex: 1, marginLeft: 16 },
+  aboName: { fontSize: 16, fontWeight: '600' },
+  aboBetrag: { fontSize: 14 },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+  emptyText: { marginTop: 16, fontSize: 16 },
 });

@@ -13,8 +13,10 @@ import {
 import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function RegisterScreen({ navigation, onRegister }) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,22 +32,22 @@ export default function RegisterScreen({ navigation, onRegister }) {
 
   const handleRegister = async () => {
     if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Fehler', 'Bitte füllen Sie alle Felder aus.');
+      Alert.alert(t('common.error'), t('common.fillAllFields'));
       return;
     }
 
     if (!validateEmail(email)) {
-      Alert.alert('Fehler', 'Bitte geben Sie eine gültige E-Mail-Adresse ein.');
+      Alert.alert(t('common.error'), t('alerts.invalidEmail'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Fehler', 'Das Passwort muss mindestens 6 Zeichen lang sein.');
+      Alert.alert(t('common.error'), t('alerts.passwordTooShort'));
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Fehler', 'Die Passwörter stimmen nicht überein.');
+      Alert.alert(t('common.error'), t('alerts.passwordMismatch'));
       return;
     }
 
@@ -55,12 +57,11 @@ export default function RegisterScreen({ navigation, onRegister }) {
       const users = usersJson ? JSON.parse(usersJson) : [];
 
       if (users.find((u) => u.email === email.toLowerCase())) {
-        Alert.alert('Fehler', 'Diese E-Mail-Adresse ist bereits registriert.');
+        Alert.alert(t('common.error'), t('alerts.emailExists'));
         setLoading(false);
         return;
       }
 
-      // Hash the password
       const salt = Crypto.randomUUID();
       const hash = await Crypto.digestStringAsync(
         Crypto.CryptoDigestAlgorithm.SHA256,
@@ -72,7 +73,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
         id: Date.now().toString(),
         name: name.trim(),
         email: email.toLowerCase().trim(),
-        password: hashedPassword, // Store hashed password
+        password: hashedPassword,
         createdAt: new Date().toISOString(),
       };
 
@@ -85,10 +86,10 @@ export default function RegisterScreen({ navigation, onRegister }) {
       }));
       await setItem('isLoggedIn', 'true');
 
-      Alert.alert('Erfolg', `Willkommen, ${newUser.name}!`);
+      Alert.alert(t('alerts.success'), t('alerts.welcome', { name: newUser.name }));
       onRegister();
     } catch (error) {
-      Alert.alert('Fehler', 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+      Alert.alert(t('common.error'), t('common.genericError'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -105,16 +106,16 @@ export default function RegisterScreen({ navigation, onRegister }) {
           <View style={styles.iconContainer}>
             <Ionicons name="person-add" size={80} color="#2196F3" />
           </View>
-          
-          <Text style={styles.title}>Registrieren</Text>
-          <Text style={styles.subtitle}>Erstellen Sie ein neues Konto</Text>
+
+          <Text style={styles.title}>{t('register.title')}</Text>
+          <Text style={styles.subtitle}>{t('register.subtitle')}</Text>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
               <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Name"
+                placeholder={t('register.namePlaceholder')}
                 placeholderTextColor="#999"
                 value={name}
                 onChangeText={setName}
@@ -125,7 +126,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
               <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="E-Mail"
+                placeholder={t('common.email')}
                 placeholderTextColor="#999"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -138,7 +139,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
               <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Passwort (min. 6 Zeichen)"
+                placeholder={t('register.passwordPlaceholder')}
                 placeholderTextColor="#999"
                 secureTextEntry={!showPassword}
                 value={password}
@@ -160,7 +161,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
               <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Passwort bestätigen"
+                placeholder={t('register.confirmPasswordPlaceholder')}
                 placeholderTextColor="#999"
                 secureTextEntry={!showConfirmPassword}
                 value={confirmPassword}
@@ -184,7 +185,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
               disabled={loading}
             >
               <Text style={styles.registerButtonText}>
-                {loading ? 'Wird registriert...' : 'Registrieren'}
+                {loading ? t('register.loading') : t('register.button')}
               </Text>
             </TouchableOpacity>
 
@@ -193,7 +194,7 @@ export default function RegisterScreen({ navigation, onRegister }) {
               onPress={() => navigation.navigate('Login')}
             >
               <Text style={styles.loginLinkText}>
-                Bereits ein Konto? Jetzt anmelden
+                {t('register.alreadyAccount')}
               </Text>
             </TouchableOpacity>
           </View>

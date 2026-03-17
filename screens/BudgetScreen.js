@@ -1,17 +1,11 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  Alert,
-  ScrollView,
+  View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, ScrollView,
 } from 'react-native';
 import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useFocusEffect } from '@react-navigation/native';
 
 const KATEGORIEN_AUSGABEN = [
@@ -28,10 +22,12 @@ const KATEGORIEN_AUSGABEN = [
   { name: 'Sonstiges', icon: 'ellipse-outline', color: '#9E9E9E' },
 ];
 
+// Internal period keys
 const ZEITRAEUME = ['monat', 'woche'];
 
 export default function BudgetScreen() {
   const { currentTheme } = useTheme();
+  const { t, tName } = useLanguage();
   const [budgets, setBudgets] = useState([]);
   const [ausgaben, setAusgaben] = useState([]);
   const [selectedKategorie, setSelectedKategorie] = useState(KATEGORIEN_AUSGABEN[0].name);
@@ -62,7 +58,7 @@ export default function BudgetScreen() {
 
   const speichereBudget = async () => {
     if (!betragLimit || parseFloat(betragLimit) <= 0) {
-      Alert.alert('Fehler', 'Bitte geben Sie ein gültiges Limit ein.');
+      Alert.alert(t('common.error'), t('budget.invalidLimit'));
       return;
     }
 
@@ -78,18 +74,17 @@ export default function BudgetScreen() {
       const budgetsJson = await getItem('budgets');
       const alleBudgets = budgetsJson ? JSON.parse(budgetsJson) : [];
 
-      // Vorhandenes Budget für diese Kategorie/Zeitraum ersetzen
       const ohneAltes = alleBudgets.filter(
         b => !(b.userEmail === userEmail && b.kategorie === selectedKategorie && b.zeitraum === zeitraum)
       );
       ohneAltes.push(neuesBudget);
       await setItem('budgets', JSON.stringify(ohneAltes));
 
-      Alert.alert('✅ Erfolg', 'Budget wurde gespeichert!');
+      Alert.alert(t('common.success'), t('budget.saved'));
       setBetragLimit('');
       ladeDaten();
     } catch (error) {
-      Alert.alert('Fehler', 'Budget konnte nicht gespeichert werden.');
+      Alert.alert(t('common.error'), t('budget.saveError'));
       console.error(error);
     }
   };
@@ -113,7 +108,6 @@ export default function BudgetScreen() {
     } else {
       startDatum = new Date(jetzt.getFullYear(), jetzt.getMonth(), 1);
     }
-
     return ausgaben
       .filter(a => a.kategorie === budget.kategorie && new Date(a.datum) >= startDatum)
       .reduce((sum, a) => sum + a.betrag, 0);
@@ -142,14 +136,14 @@ export default function BudgetScreen() {
             <Ionicons name={cat.icon} size={20} color={cat.color} />
           </View>
           <View style={styles.budgetInfo}>
-            <Text style={[styles.budgetKategorie, { color: currentTheme.text }]}>{item.kategorie}</Text>
+            <Text style={[styles.budgetKategorie, { color: currentTheme.text }]}>{tName(item.kategorie)}</Text>
             <Text style={[styles.budgetZeitraum, { color: currentTheme.textSecondary }]}>
-              {item.zeitraum === 'monat' ? 'Diesen Monat' : 'Diese Woche'}
+              {item.zeitraum === 'monat' ? t('budget.thisMonth') : t('budget.thisWeek')}
             </Text>
           </View>
           <View style={styles.budgetBetraege}>
             <Text style={[styles.budgetVerbrauch, { color: farbe }]}>{verbrauch.toFixed(2)} €</Text>
-            <Text style={[styles.budgetLimit, { color: currentTheme.textSecondary }]}>von {item.betragLimit.toFixed(2)} €</Text>
+            <Text style={[styles.budgetLimit, { color: currentTheme.textSecondary }]}>{t('budget.of')} {item.betragLimit.toFixed(2)} €</Text>
           </View>
           <TouchableOpacity onPress={() => loescheBudget(item.id)} style={styles.deleteBtn}>
             <Ionicons name="trash-outline" size={20} color="red" />
@@ -159,7 +153,7 @@ export default function BudgetScreen() {
           <View style={[styles.progressFill, { width: `${prozent * 100}%`, backgroundColor: farbe }]} />
         </View>
         <Text style={[styles.prozentText, { color: farbe }]}>
-          {(prozent * 100).toFixed(0)}% verwendet
+          {(prozent * 100).toFixed(0)}% {t('budget.used')}
         </Text>
       </View>
     );
@@ -172,10 +166,10 @@ export default function BudgetScreen() {
         <View style={[styles.formCard, { backgroundColor: currentTheme.cardBackground }]}>
           <View style={styles.formHeaderRow}>
             <Ionicons name="pie-chart-outline" size={28} color={currentTheme.primary} />
-            <Text style={[styles.formTitle, { color: currentTheme.text }]}>Neues Budget</Text>
+            <Text style={[styles.formTitle, { color: currentTheme.text }]}>{t('budget.newBudget')}</Text>
           </View>
 
-          <Text style={[styles.fieldLabel, { color: currentTheme.text }]}>Kategorie</Text>
+          <Text style={[styles.fieldLabel, { color: currentTheme.text }]}>{t('budget.category')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kategorienScroll}>
             {KATEGORIEN_AUSGABEN.map(kat => (
               <TouchableOpacity
@@ -191,13 +185,13 @@ export default function BudgetScreen() {
               >
                 <Ionicons name={kat.icon} size={16} color={selectedKategorie === kat.name ? '#fff' : kat.color} />
                 <Text style={[styles.kategorieChipText, { color: selectedKategorie === kat.name ? '#fff' : currentTheme.text }]}>
-                  {kat.name}
+                  {tName(kat.name)}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
-          <Text style={[styles.fieldLabel, { color: currentTheme.text }]}>Limit (€)</Text>
+          <Text style={[styles.fieldLabel, { color: currentTheme.text }]}>{t('budget.limit')}</Text>
           <View style={[styles.inputContainer, { borderColor: currentTheme.border }]}>
             <Text style={[styles.currencySymbol, { color: currentTheme.textSecondary }]}>€</Text>
             <TextInput
@@ -210,7 +204,7 @@ export default function BudgetScreen() {
             />
           </View>
 
-          <Text style={[styles.fieldLabel, { color: currentTheme.text }]}>Zeitraum</Text>
+          <Text style={[styles.fieldLabel, { color: currentTheme.text }]}>{t('budget.period')}</Text>
           <View style={styles.zeitraumRow}>
             {ZEITRAEUME.map(z => (
               <TouchableOpacity
@@ -225,7 +219,7 @@ export default function BudgetScreen() {
                 onPress={() => setZeitraum(z)}
               >
                 <Text style={[styles.zeitraumText, { color: zeitraum === z ? '#fff' : currentTheme.text }]}>
-                  {z === 'monat' ? 'Monat' : 'Woche'}
+                  {z === 'monat' ? t('budget.month') : t('budget.week')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -236,7 +230,7 @@ export default function BudgetScreen() {
             onPress={speichereBudget}
           >
             <Ionicons name="checkmark-circle" size={20} color="#fff" />
-            <Text style={styles.saveButtonText}>Budget speichern</Text>
+            <Text style={styles.saveButtonText}>{t('budget.saveButton')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -245,7 +239,7 @@ export default function BudgetScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="pie-chart-outline" size={48} color={currentTheme.textSecondary} />
             <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>
-              Noch keine Budgets angelegt.
+              {t('budget.empty')}
             </Text>
           </View>
         ) : (
@@ -265,84 +259,38 @@ export default function BudgetScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   formCard: {
-    margin: 16,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    margin: 16, padding: 20, borderRadius: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
   },
-  formHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
+  formHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   formTitle: { fontSize: 20, fontWeight: 'bold' },
   fieldLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginTop: 4 },
   kategorienScroll: { marginBottom: 12 },
   kategorieChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginRight: 8,
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1, marginRight: 8, gap: 6,
   },
   kategorieChipText: { fontSize: 13 },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 52,
-    marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderRadius: 12,
+    paddingHorizontal: 16, height: 52, marginBottom: 12,
   },
   currencySymbol: { fontSize: 20, fontWeight: 'bold', marginRight: 8 },
   input: { flex: 1, fontSize: 20, fontWeight: 'bold' },
   zeitraumRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  zeitraumButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
+  zeitraumButton: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   zeitraumText: { fontSize: 14, fontWeight: '600' },
   saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, borderRadius: 12, gap: 8,
   },
   saveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   listContainer: { paddingHorizontal: 16, paddingBottom: 20 },
   budgetItem: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 16, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
   },
   budgetHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  catIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
+  catIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   budgetInfo: { flex: 1 },
   budgetKategorie: { fontSize: 15, fontWeight: '700' },
   budgetZeitraum: { fontSize: 12 },
@@ -350,12 +298,7 @@ const styles = StyleSheet.create({
   budgetVerbrauch: { fontSize: 15, fontWeight: 'bold' },
   budgetLimit: { fontSize: 12 },
   deleteBtn: { padding: 4 },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
+  progressBar: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
   progressFill: { height: '100%', borderRadius: 4 },
   prozentText: { fontSize: 12, fontWeight: '600' },
   emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },

@@ -13,13 +13,14 @@ import {
 import { getItem, setItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const KONTEN = [
   { name: 'Girokonto', icon: 'card-outline' },
   { name: 'Brieftasche', icon: 'wallet-outline' },
   { name: 'Sparbuch', icon: 'book-outline' },
   { name: 'Kreditkarte', icon: 'card' },
-]
+];
 
 const KATEGORIEN = [
   { name: 'Miete', icon: 'home-outline', color: '#FF5722' },
@@ -36,6 +37,7 @@ const KATEGORIEN = [
 
 export default function AusgabenScreen() {
   const { currentTheme } = useTheme();
+  const { t, tName } = useLanguage();
   const [betrag, setBetrag] = useState('');
   const [kategorie, setKategorie] = useState('Miete');
   const [notiz, setNotiz] = useState('');
@@ -43,14 +45,14 @@ export default function AusgabenScreen() {
 
   const speichereAusgabe = async () => {
     if (!betrag || parseFloat(betrag) <= 0) {
-      Alert.alert('Fehler', 'Bitte geben Sie einen gültigen Betrag ein.');
+      Alert.alert(t('common.error'), t('common.invalidAmount'));
       return;
     }
 
     try {
       const currentUserJson = await getItem('currentUser');
       if (!currentUserJson) {
-        Alert.alert('Fehler', 'Sie sind nicht angemeldet.');
+        Alert.alert(t('common.error'), t('common.notLoggedIn'));
         return;
       }
       const currentUser = JSON.parse(currentUserJson);
@@ -72,33 +74,31 @@ export default function AusgabenScreen() {
       ausgaben.push(neueAusgabe);
       await setItem('ausgaben', JSON.stringify(ausgaben));
 
-      Alert.alert('✅ Erfolg', 'Ausgabe wurde erfolgreich gespeichert!');
+      Alert.alert(t('common.success'), t('expense.saved'));
       setBetrag('');
       setNotiz('');
       setKategorie('Miete');
       setKonto('Girokonto');
     } catch (error) {
-      Alert.alert('Fehler', 'Ausgabe konnte nicht gespeichert werden.');
+      Alert.alert(t('common.error'), t('expense.saveError'));
       console.error(error);
     }
   };
-
-  const selectedCategory = KATEGORIEN.find(kat => kat.name === kategorie);
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[styles.container, { backgroundColor: currentTheme.background }]}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Header Card */}
         <View style={[styles.headerCard, { backgroundColor: currentTheme.primary }]}>
           <Ionicons name="remove-circle" size={48} color="#fff" />
-          <Text style={styles.headerTitle}>Neue Ausgabe</Text>
-          <Text style={styles.headerSubtitle}>Erfasse deine Ausgaben schnell und einfach</Text>
+          <Text style={styles.headerTitle}>{t('expense.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('expense.subtitle')}</Text>
         </View>
 
         {/* Form Card */}
@@ -107,7 +107,7 @@ export default function AusgabenScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Ionicons name="cash" size={20} color={currentTheme.primary} />
-              <Text style={[styles.label, { color: currentTheme.text }]}>Betrag</Text>
+              <Text style={[styles.label, { color: currentTheme.text }]}>{t('common.amount')}</Text>
             </View>
             <View style={[styles.amountContainer, { borderColor: currentTheme.border }]}>
               <Text style={[styles.currencySymbol, { color: currentTheme.textSecondary }]}>€</Text>
@@ -126,7 +126,7 @@ export default function AusgabenScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Ionicons name="server-outline" size={20} color={currentTheme.primary} />
-              <Text style={[styles.label, { color: currentTheme.text }]}>Konto</Text>
+              <Text style={[styles.label, { color: currentTheme.text }]}>{t('common.account')}</Text>
             </View>
             <View style={styles.kategorienContainer}>
               {KONTEN.map((k) => {
@@ -144,10 +144,10 @@ export default function AusgabenScreen() {
                     ]}
                     onPress={() => setKonto(k.name)}
                   >
-                    <Ionicons 
-                      name={k.icon} 
-                      size={24} 
-                      color={isSelected ? '#fff' : currentTheme.primary} 
+                    <Ionicons
+                      name={k.icon}
+                      size={24}
+                      color={isSelected ? '#fff' : currentTheme.primary}
                     />
                     <Text
                       style={[
@@ -158,7 +158,7 @@ export default function AusgabenScreen() {
                         },
                       ]}
                     >
-                      {k.name}
+                      {tName(k.name)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -170,7 +170,7 @@ export default function AusgabenScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Ionicons name="grid" size={20} color={currentTheme.primary} />
-              <Text style={[styles.label, { color: currentTheme.text }]}>Kategorie</Text>
+              <Text style={[styles.label, { color: currentTheme.text }]}>{t('common.category')}</Text>
             </View>
             <View style={styles.kategorienContainer}>
               {KATEGORIEN.map((kat) => {
@@ -188,10 +188,10 @@ export default function AusgabenScreen() {
                     ]}
                     onPress={() => setKategorie(kat.name)}
                   >
-                    <Ionicons 
-                      name={kat.icon} 
-                      size={24} 
-                      color={isSelected ? '#fff' : kat.color} 
+                    <Ionicons
+                      name={kat.icon}
+                      size={24}
+                      color={isSelected ? '#fff' : kat.color}
                     />
                     <Text
                       style={[
@@ -202,7 +202,7 @@ export default function AusgabenScreen() {
                         },
                       ]}
                     >
-                      {kat.name}
+                      {tName(kat.name)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -214,12 +214,12 @@ export default function AusgabenScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Ionicons name="document-text-outline" size={20} color={currentTheme.primary} />
-              <Text style={[styles.label, { color: currentTheme.text }]}>Notiz (optional)</Text>
+              <Text style={[styles.label, { color: currentTheme.text }]}>{t('common.note')}</Text>
             </View>
             <View style={[styles.notizContainer, { borderColor: currentTheme.border }]}>
               <TextInput
                 style={[styles.notizInput, { color: currentTheme.text }]}
-                placeholder="Zusätzliche Informationen..."
+                placeholder={t('common.notePlaceholder')}
                 placeholderTextColor={currentTheme.textSecondary}
                 multiline
                 numberOfLines={4}
@@ -230,13 +230,13 @@ export default function AusgabenScreen() {
           </View>
 
           {/* Speichern Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.speichernButton, { backgroundColor: currentTheme.primary }]}
             onPress={speichereAusgabe}
             activeOpacity={0.8}
           >
             <Ionicons name="checkmark-circle" size={24} color="#fff" />
-            <Text style={styles.speichernButtonText}>Ausgabe speichern</Text>
+            <Text style={styles.speichernButtonText}>{t('expense.saveButton')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -245,120 +245,38 @@ export default function AusgabenScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  container: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
   headerCard: {
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 12,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.9,
-    marginTop: 4,
-  },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 12 },
+  headerSubtitle: { fontSize: 14, color: '#fff', opacity: 0.9, marginTop: 4 },
   formCard: {
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 20, padding: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5,
   },
-  inputGroup: {
-    marginBottom: 24,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  inputGroup: { marginBottom: 24 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
+  label: { fontSize: 16, fontWeight: '600' },
   amountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 60,
+    flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderRadius: 12, paddingHorizontal: 16, height: 60,
   },
-  currencySymbol: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  kategorienContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
+  currencySymbol: { fontSize: 24, fontWeight: 'bold', marginRight: 8 },
+  amountInput: { flex: 1, fontSize: 28, fontWeight: 'bold' },
+  kategorienContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   kategorieButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
-    minWidth: 140,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
+    borderRadius: 12, gap: 8, minWidth: 140,
   },
-  kategorieText: {
-    fontSize: 14,
-  },
-  notizContainer: {
-    borderWidth: 2,
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 100,
-  },
-  notizInput: {
-    fontSize: 16,
-    textAlignVertical: 'top',
-  },
+  kategorieText: { fontSize: 14 },
+  notizContainer: { borderWidth: 2, borderRadius: 12, padding: 16, minHeight: 100 },
+  notizInput: { fontSize: 16, textAlignVertical: 'top' },
   speichernButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 18,
-    borderRadius: 12,
-    marginTop: 8,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    padding: 18, borderRadius: 12, marginTop: 8, gap: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
-  speichernButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  speichernButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
 });

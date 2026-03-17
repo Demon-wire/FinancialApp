@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd \"C:\\\\Users\\\\alexa\\\\Documents\\\\Programmieren\\\\FinanzApp\" && npx eas build --platform android --profile production)"
+      "Bash(cd \"C:\\\\Users\\\\alexa\\\\Documents\\\\Programmieren\\\\FinanzApp\" && npx eas build --platform android --profile production)",
+      "Bash(wc:*)"
     ]
   }
 }

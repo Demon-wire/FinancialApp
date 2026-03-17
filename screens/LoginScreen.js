@@ -14,11 +14,13 @@ import { getItem, setItem, removeItem } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Crypto from 'expo-crypto';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 30 * 1000; // 30 Sekunden
+const LOCKOUT_DURATION_MS = 30 * 1000;
 
 export default function LoginScreen({ navigation, onLogin }) {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -38,7 +40,6 @@ export default function LoginScreen({ navigation, onLogin }) {
     })();
   }, []);
 
-  // Countdown-Timer für Sperre
   useEffect(() => {
     if (lockoutRemaining <= 0) return;
     const timer = setTimeout(() => setLockoutRemaining(prev => Math.max(0, prev - 1)), 1000);
@@ -78,16 +79,15 @@ export default function LoginScreen({ navigation, onLogin }) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Fehler', 'Bitte füllen Sie alle Felder aus.');
+      Alert.alert(t('common.error'), t('common.fillAllFields'));
       return;
     }
 
     const emailKey = email.toLowerCase().trim();
 
-    // Rate-Limiting prüfen
     const { locked, remaining } = await checkRateLimit(emailKey);
     if (locked) {
-      Alert.alert('Gesperrt', `Zu viele Fehlversuche. Bitte warten Sie ${remaining} Sekunden.`);
+      Alert.alert(t('alerts.locked'), t('alerts.tooManyAttempts', { seconds: remaining }));
       return;
     }
 
@@ -108,7 +108,6 @@ export default function LoginScreen({ navigation, onLogin }) {
           );
           passwordMatch = computed === storedHash;
         } else if (user.password) {
-          // Legacy plain-text password — re-hash on successful login
           passwordMatch = (user.password === password);
           if (passwordMatch) {
             const salt = Crypto.randomUUID();
@@ -128,24 +127,24 @@ export default function LoginScreen({ navigation, onLogin }) {
           await setItem('currentUser', JSON.stringify({ email: user.email, name: user.name }));
           await setItem('isLoggedIn', 'true');
           await setItem('lastLoggedInUser', user.email);
-          Alert.alert('Erfolg', `Willkommen zurück, ${user.name}!`);
+          Alert.alert(t('alerts.success'), t('alerts.welcomeBack', { name: user.name }));
           onLogin();
         } else {
           await recordFailedAttempt(emailKey);
           const data = await getRateLimitData(emailKey);
           const verbleibend = MAX_LOGIN_ATTEMPTS - data.count;
           if (verbleibend > 0) {
-            Alert.alert('Fehler', `E-Mail oder Passwort ist falsch. Noch ${verbleibend} Versuch(e).`);
+            Alert.alert(t('common.error'), t('alerts.wrongCredentials', { attempts: verbleibend }));
           } else {
-            Alert.alert('Gesperrt', 'Zu viele Fehlversuche. Bitte warten Sie 30 Sekunden.');
+            Alert.alert(t('alerts.locked'), t('alerts.lockedFinal'));
           }
         }
       } else {
         await recordFailedAttempt(emailKey);
-        Alert.alert('Fehler', 'E-Mail oder Passwort ist falsch.');
+        Alert.alert(t('common.error'), t('alerts.wrongCredentialsNoAttempts'));
       }
     } catch (error) {
-      Alert.alert('Fehler', 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+      Alert.alert(t('common.error'), t('common.genericError'));
       console.error(error);
     } finally {
       setLoading(false);
@@ -156,11 +155,11 @@ export default function LoginScreen({ navigation, onLogin }) {
     try {
       const savedEmail = await getItem('lastLoggedInUser');
       if (!savedEmail) {
-        return Alert.alert('Info', 'Bitte melden Sie sich zuerst manuell an, um die biometrische Anmeldung zu aktivieren.');
+        return Alert.alert(t('common.info'), t('alerts.biometricFirst'));
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Melden Sie sich mit Ihrem Fingerabdruck an',
+        promptMessage: t('alerts.biometricPrompt'),
       });
 
       if (result.success) {
@@ -171,15 +170,15 @@ export default function LoginScreen({ navigation, onLogin }) {
         if (user) {
           await setItem('currentUser', JSON.stringify({ email: user.email, name: user.name }));
           await setItem('isLoggedIn', 'true');
-          Alert.alert('Erfolg', `Willkommen zurück, ${user.name}!`);
+          Alert.alert(t('alerts.success'), t('alerts.welcomeBack', { name: user.name }));
           onLogin();
         } else {
-          Alert.alert('Fehler', 'Benutzer nicht gefunden. Bitte melden Sie sich manuell an.');
+          Alert.alert(t('common.error'), t('alerts.userNotFoundBiometric'));
         }
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Fehler', 'Biometrische Anmeldung fehlgeschlagen.');
+      Alert.alert(t('common.error'), t('alerts.biometricFailed'));
     }
   };
 
@@ -195,14 +194,14 @@ export default function LoginScreen({ navigation, onLogin }) {
           </View>
 
           <Text style={styles.title}>FinanzApp</Text>
-          <Text style={styles.subtitle}>Melden Sie sich an</Text>
+          <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
 
           <View style={styles.form}>
             <View style={styles.inputContainer}>
               <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="E-Mail"
+                placeholder={t('common.email')}
                 placeholderTextColor="#999"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -215,7 +214,7 @@ export default function LoginScreen({ navigation, onLogin }) {
               <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Passwort"
+                placeholder={t('common.password')}
                 placeholderTextColor="#999"
                 secureTextEntry={!showPassword}
                 value={password}
@@ -235,7 +234,7 @@ export default function LoginScreen({ navigation, onLogin }) {
 
             {lockoutRemaining > 0 && (
               <Text style={styles.lockoutText}>
-                Konto gesperrt. Bitte warten Sie {lockoutRemaining} Sekunde(n).
+                {t('login.lockedAccount', { seconds: lockoutRemaining })}
               </Text>
             )}
 
@@ -245,7 +244,7 @@ export default function LoginScreen({ navigation, onLogin }) {
               disabled={loading || lockoutRemaining > 0}
             >
               <Text style={styles.loginButtonText}>
-                {loading ? 'Wird angemeldet...' : 'Anmelden'}
+                {loading ? t('login.loading') : t('login.button')}
               </Text>
             </TouchableOpacity>
 
@@ -255,7 +254,7 @@ export default function LoginScreen({ navigation, onLogin }) {
                 onPress={handleBiometricLogin}
               >
                 <Ionicons name="finger-print" size={24} color="#fff" />
-                <Text style={styles.biometricButtonText}>Biometrische Anmeldung</Text>
+                <Text style={styles.biometricButtonText}>{t('login.biometric')}</Text>
               </TouchableOpacity>
             )}
 
@@ -264,7 +263,7 @@ export default function LoginScreen({ navigation, onLogin }) {
               onPress={() => navigation.navigate('Register')}
             >
               <Text style={styles.registerLinkText}>
-                Noch kein Konto? Jetzt registrieren
+                {t('login.noAccount')}
               </Text>
             </TouchableOpacity>
           </View>
