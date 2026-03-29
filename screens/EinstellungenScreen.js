@@ -479,7 +479,7 @@ export default function EinstellungenScreen({ onLogout }) {
             </Text>
           </View>
           <View style={styles.themeContainer}>
-            {['en', 'de', 'hi', 'zh', 'it', 'es'].map((lang) => {
+            {['en', 'de', 'hi', 'zh', 'it', 'es', 'pt'].map((lang) => {
               const isSelected = language === lang;
               return (
                 <TouchableOpacity
