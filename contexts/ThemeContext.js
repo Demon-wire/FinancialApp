@@ -72,7 +72,7 @@ export const THEMES = {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState('darkPink'); // Standard-Theme ist jetzt dunkel pink
+  const [theme, setTheme] = useState('light');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

@@ -23,6 +23,7 @@ import KontostandScreen from './screens/KontostandScreen';
 import EditTransactionScreen from './screens/EditTransactionScreen';
 import BudgetScreen from './screens/BudgetScreen';
 import { verarbeiteAbos } from './services/aboService';
+import { planeDailyNotification, brecheNotificationAb } from './services/notificationService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -191,6 +192,11 @@ export default function App() {
   useEffect(() => {
     if (isLoggedIn) {
       verarbeiteAbos();
+      getItem('currentUser').then(raw => {
+        if (!raw) return;
+        const user = JSON.parse(raw);
+        planeDailyNotification(user.email);
+      });
     }
   }, [isLoggedIn]);
 
@@ -211,6 +217,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      await brecheNotificationAb();
       await removeItem('isLoggedIn');
       await removeItem('currentUser');
       setIsLoggedIn(false);
