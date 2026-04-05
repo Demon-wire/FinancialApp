@@ -1,64 +1,117 @@
-# WICHTIG NUR AUF DEV BRANCH SCHAUEN
-
 # FinanzApp
 
-Eine Cross-Platform Finanz-App für Android und iOS, die es ermöglicht, Einnahmen zu erfassen, zu kategorisieren und Statistiken anzuzeigen.
+Eine lokale, datenschutzfreundliche Finanzverwaltungs-App für Android, iOS und Web. Einnahmen und Ausgaben erfassen, Budgets setzen, Abonnements verwalten und Statistiken auswerten – alles ohne Internetverbindung oder Cloud.
+
+---
 
 ## Features
 
-- ✅ Einnahmen erfassen mit Betrag, Kategorie und optionaler Notiz
-- ✅ Kategorien: Gehalt, Nebentätigkeit, Investitionen, Geschenk, Sonstiges
-- ✅ Statistikansicht mit Filterung nach Zeitraum (Woche, Monat, Jahr)
-- ✅ Übersicht nach Kategorien
-- ✅ Verlauf der letzten Einnahmen
-- ✅ Lokale Datenspeicherung (keine Internetverbindung erforderlich)
+| Bereich | Was es kann |
+|---|---|
+| **Transaktionen** | Einnahmen & Ausgaben mit Betrag, Kategorie, Konto und Notiz erfassen |
+| **Kontostand** | Übersicht aller Konten mit Einzelsaldo und Gesamtsaldo |
+| **Statistiken** | Kategorieaufteilung mit Balken und Prozentanteilen, filterbar nach Tag/Woche/Monat/Jahr |
+| **Budget** | Ausgabenlimits pro Kategorie und Zeitraum mit Fortschrittsanzeige |
+| **Abonnements** | Wiederkehrende Kosten (wöchentlich/monatlich/jährlich) automatisch als Ausgabe buchen |
+| **Gewinn** | Einnahmen minus Ausgaben und anteilige Abokosten pro Zeitraum |
+| **Mehrbenutzer** | Jeder Nutzer sieht nur seine eigenen Daten |
+| **Biometrie** | Fingerabdruck / Face ID als Alternative zum Passwort |
+| **Export** | Alle Transaktionen als CSV-Datei exportieren |
+| **Themes** | 5 eingebaute Farbthemes (Light, Dark, Dark Pink, Midnight, Brown) |
+| **Sprachen** | Deutsch, Englisch, Hindi, Chinesisch, Italienisch, Spanisch, Portugiesisch |
 
-## Installation
+---
 
-1. Stelle sicher, dass Node.js installiert ist
-2. Installiere die Abhängigkeiten:
+## Schnellstart
+
 ```bash
+# Abhängigkeiten installieren
 npm install
+
+# Entwicklungsserver starten
+npx expo start
 ```
 
-3. Starte die App:
-```bash
-npm start
-```
+Danach:
+- **Browser:** `w` drücken oder Link öffnen
+- **Android/iOS:** [Expo Go](https://expo.dev/go) App installieren und QR-Code scannen
 
-## Verwendung
+Weitere Installationsmethoden: [docs/INSTALLATION.md](docs/INSTALLATION.md)
 
-### Android
-```bash
-npm run android
-```
+---
 
-### iOS
-```bash
-npm run ios
-```
+## Tech Stack
 
-## Technologien
+- **React Native** 0.81 + **Expo** 54
+- **React Navigation** v7 (Bottom Tabs + Stack)
+- **AsyncStorage** – lokale Datenpersistenz
+- **expo-secure-store** – sichere Session-Speicherung (OS Keychain)
+- **expo-crypto** – SHA-256 Passwort-Hashing mit Salt
+- **expo-local-authentication** – Biometrie
+- **expo-file-system** + **expo-sharing** – CSV-Export
 
-- React Native mit Expo
-- React Navigation für die Navigation
-- AsyncStorage für lokale Datenspeicherung
-- Expo Vector Icons für Icons
+---
 
 ## Projektstruktur
 
 ```
-FinanzApp/
-├── App.js                 # Hauptkomponente mit Navigation
-├── screens/
-│   ├── EinnahmenScreen.js # Eingabefeld für Einnahmen
-│   └── StatistikScreen.js # Statistikansicht
-├── package.json
-└── README.md
+FinancialApp/
+├── App.js                    # Root: Auth-State, Navigation, Provider
+├── constants/
+│   └── Categories.js         # Kategorie-Definitionen (Icon, Farbe, Name)
+├── contexts/
+│   ├── ThemeContext.js        # Theme-Provider (5 Themes)
+│   └── LanguageContext.js     # i18n-Provider mit t() und tName()
+├── locales/                   # Übersetzungsdateien (de, en, hi, zh, it, es, pt)
+├── screens/                   # Alle App-Screens
+│   ├── LoginScreen.js
+│   ├── RegisterScreen.js
+│   ├── EinnahmenScreen.js
+│   ├── AusgabenScreen.js
+│   ├── AlleTransaktionenScreen.js
+│   ├── KontostandScreen.js
+│   ├── StatistikScreen.js
+│   ├── BudgetScreen.js
+│   ├── AbosScreen.js
+│   ├── GewinnScreen.js
+│   ├── EditTransactionScreen.js
+│   ├── EinstellungenScreen.js
+│   └── AnleitungScreen.js
+├── services/
+│   └── aboService.js          # Automatische Aboabbuchung beim Login
+└── utils/
+    └── storage.js             # Unified Storage (SecureStore + AsyncStorage)
 ```
 
-## Nächste Schritte
+---
 
-Um die App auf einem echten Gerät zu testen:
-1. Installiere die Expo Go App auf deinem Smartphone
-2. Scanne den QR-Code, der beim Starten der App angezeigt wird.
+## npm-Skripte
+
+| Befehl | Beschreibung |
+|---|---|
+| `npx expo start` | Entwicklungsserver starten |
+| `npm run android` | Direkt auf Android-Gerät/Emulator starten |
+| `npm run ios` | Direkt auf iOS-Simulator starten |
+| `npm run web` | Im Browser starten |
+| `eas build --platform android --profile preview` | APK bauen (EAS) |
+
+---
+
+## Dokumentation
+
+| Datei | Inhalt |
+|---|---|
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Expo Go, APK-Build, Android Studio |
+| [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md) | Technische Architektur, Datenfluss, Sicherheit |
+| [docs/DATENSPEICHERUNG.md](docs/DATENSPEICHERUNG.md) | Welche Daten wo gespeichert werden |
+| [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) | Datenschutzerklärung |
+
+---
+
+## Datenschutz
+
+Alle Daten bleiben **ausschließlich lokal auf dem Gerät**. Keine Cloud, kein Tracking, keine Werbung. Vollständige Erklärung: [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md)
+
+---
+
+**Autor:** Mad_LX0 · mad_lx0@proton.me
